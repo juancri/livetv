@@ -20,7 +20,7 @@ Para inspeccionar la app en ejecución: `npx electron . --remote-debugging-port=
 ## Arquitectura
 
 - **main.js**: lee la config (`--config` → `~/.config/livetv/streams.json` → `./streams.json`) y la entrega por IPC (`get-config`, también `toggle-fullscreen` y `quit`, expuestos en `preload.js` como `window.livetv`). Sirve `renderer/` desde un **servidor HTTP local en 127.0.0.1:puerto aleatorio**, no desde `file://`: los embeds de YouTube fallan sin un origin/Referer válido.
-- **renderer/app.js**: toda la lógica de UI. Cada stream es un objeto `tile` (`el`, `player`, `ready`, `stream`, `name`) que envuelve un `YT.Player` de la IFrame API. `stream.url` → `YT.Player` con `videoId`; `stream.channel` (ID `UC…`) → iframe manual a `embed/live_stream?channel=…` envuelto con `new YT.Player(iframe)`, porque la API no acepta canales directamente. `createPlayer(tile)` destruye y recrea el player (se usa para recargar y reintentar).
+- **renderer/app.js**: toda la lógica de UI. Cada stream es un objeto `tile` (`el`, `player`, `ready`, `stream`, `name`) que envuelve un `YT.Player` de la IFrame API. `stream.url` → `YT.Player` con `videoId`; `stream.channel` (ID `UC…`, handle `@nombre` o URL de canal) → `main.js` busca el live actual (IPC `find-live`: canonical de `<canal>/live`) y se crea un `YT.Player` con ese `videoId`; se busca de nuevo en cada carga/reintento. No se usa `embed/live_stream?channel=…`: da Error 150 aunque el live sea embebible. `createPlayer(tile)` destruye y recrea el player (se usa para recargar y reintentar).
 - **Audio**: `volume` y `muted` son globales (como un televisor), no por tile. `applyAudio()` desmutea solo el tile enfocado y silencia el resto; se llama al cambiar foco, en `onReady` y en cada `PLAYING`.
 
 ## Detalles no obvios

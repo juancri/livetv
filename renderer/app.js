@@ -90,7 +90,10 @@ function setFocus(i) {
 function createPlayer(tile) {
   clearTimeout(tile.retryTimer);
   if (tile.player) tile.player.destroy();
+  tile.player = null;
   tile.ready = false;
+  // Invalida una búsqueda de live pendiente de una carga anterior.
+  const load = tile.load = {};
   tile.playerHost.replaceChildren();
   setNoSignal(tile, null);
 
@@ -126,27 +129,42 @@ function createPlayer(tile) {
     },
   };
 
-  if (tile.stream.channel) {
-    // embed/live_stream sigue el live actual del canal, pero YT.Player no lo
-    // soporta directamente: se crea el iframe a mano y se envuelve.
-    const iframe = document.createElement('iframe');
-    const params = new URLSearchParams({ ...playerVars, enablejsapi: 1, channel: tile.stream.channel });
-    iframe.src = `https://www.youtube.com/embed/live_stream?${params}`;
-    iframe.allow = 'autoplay; encrypted-media';
-    tile.playerHost.append(iframe);
-    tile.player = new YT.Player(iframe, { events });
-  } else {
-    const videoId = parseVideoId(tile.stream.url || '');
-    if (!videoId) {
-      tile.player = null;
-      setNoSignal(tile, 'SIN SEÑAL');
-      setStatus(tile, `URL inválida: ${tile.stream.url}`);
-      return;
-    }
+  const mount = (videoId) => {
     const div = document.createElement('div');
     div.className = 'player';
     tile.playerHost.append(div);
     tile.player = new YT.Player(div, { videoId, playerVars, events });
+  };
+
+  if (tile.stream.channel) {
+    // main busca el live actual del canal en cada carga, así un reintento
+    // encuentra el live nuevo si el canal cambió de transmisión.
+    window.livetv.findLive(tile.stream.channel)
+      .then((videoId) => {
+        if (tile.load !== load) return;
+        if (videoId) {
+          mount(videoId);
+          return;
+        }
+        setNoSignal(tile, 'SIN SEÑAL');
+        setStatus(tile, 'Sin live, reintentando…');
+        tile.retryTimer = setTimeout(() => createPlayer(tile), ENDED_RETRY_MS);
+      })
+      .catch((err) => {
+        if (tile.load !== load) return;
+        console.warn(`No se pudo buscar el live de ${tile.stream.channel}:`, err);
+        setNoSignal(tile, 'SIN SEÑAL');
+        setStatus(tile, 'Reintentando…');
+        tile.retryTimer = setTimeout(() => createPlayer(tile), ENDED_RETRY_MS);
+      });
+  } else {
+    const videoId = parseVideoId(tile.stream.url || '');
+    if (!videoId) {
+      setNoSignal(tile, 'SIN SEÑAL');
+      setStatus(tile, `URL inválida: ${tile.stream.url}`);
+      return;
+    }
+    mount(videoId);
   }
 }
 

@@ -35,6 +35,24 @@ function loadConfig() {
   return { error: `No se encontró configuración. Crea uno de:\n${candidates.join('\n')}` };
 }
 
+// URL base de un canal a partir de un ID UC…, un handle (@nombre o nombre)
+// o una URL de canal.
+function channelUrl(value) {
+  if (/^UC[\w-]{22}$/.test(value)) return `https://www.youtube.com/channel/${value}`;
+  if (/^https?:\/\//.test(value)) return value.replace(/\/(live|featured|videos|streams)?\/?$/, '');
+  return `https://www.youtube.com/@${value.replace(/^@/, '')}`;
+}
+
+// embed/live_stream?channel= da Error 150 aunque el live sí sea embebible,
+// así que se busca el video del live actual: <canal>/live lo tiene como
+// canonical. Devuelve null si el canal no está transmitiendo.
+async function findLiveVideo(channel) {
+  const res = await fetch(`${channelUrl(channel)}/live`, { headers: { 'User-Agent': app.userAgentFallback } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const m = (await res.text()).match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/);
+  return m ? m[1] : null;
+}
+
 // Los embeds de YouTube fallan desde file:// (sin Referer/origin válido),
 // así que el renderer se sirve desde un HTTP local.
 function startServer() {
@@ -87,6 +105,7 @@ async function createWindow() {
 }
 
 ipcMain.handle('get-config', () => loadConfig());
+ipcMain.handle('find-live', (_e, channel) => findLiveVideo(channel));
 ipcMain.on('toggle-fullscreen', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   win.setFullScreen(!win.isFullScreen());
