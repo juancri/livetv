@@ -1,0 +1,21 @@
+{
+  "columns": null,
+  "streams": [
+    {
+      "name": "Lofi Girl",
+      "url": "https://www.youtube.com/watch?v=0sfDth4lMLc"
+    },
+    {
+      "name": "DW News",
+      "channel": "UCknLrEdhRCp1aegoMqRaCZg"
+    },
+    {
+      "name": "Al Jazeera English",
+      "channel": "UCNye-wNBqNL5ZzHSJj3l8Bg"
+    },
+    {
+      "name": "France 24 English",
+      "channel": "UCQfwfsi5VrQ8yKZ-UWmAEFg"
+    }
+  ]
+}

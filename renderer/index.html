@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>LiveTV</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="grid"></main>
+  <pre id="message" hidden></pre>
+  <div id="osd-channel" class="osd" hidden>
+    <div class="osd-number"></div>
+    <div class="osd-name"></div>
+  </div>
+  <div id="osd" class="osd" hidden>
+    <div class="osd-row"><span class="osd-label"></span><span class="osd-value"></span></div>
+    <div class="osd-bar"></div>
+  </div>
+  <div id="help" hidden>
+    <b>←↑→↓ / hjkl</b> mover foco · <b>1–9</b> ir a tile · <b>Enter</b> ampliar ·
+    <b>m</b> silenciar · <b>+/−</b> volumen · <b>r</b> recargar · <b>f/F11</b> pantalla completa ·
+    <b>?</b> ayuda · <b>q</b> salir
+  </div>
+  <script src="app.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>

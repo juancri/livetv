@@ -1,0 +1,13 @@
+{
+  "name": "livetv",
+  "version": "0.1.0",
+  "description": "Mosaico de streams en vivo de YouTube con foco de audio por teclado",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^38.0.0"
+  }
+}

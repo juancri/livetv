@@ -1,0 +1,182 @@
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: #eee;
+  font: 14px system-ui, sans-serif;
+  overflow: hidden;
+  cursor: default;
+}
+
+#grid {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  gap: 2px;
+}
+
+.tile {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border: 2px solid transparent;
+  background: #111;
+}
+
+/* Borde de foco como capa propia: un outline/border del tile queda tapado por el iframe. */
+.tile .focus-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 6px solid transparent;
+  pointer-events: none;
+}
+.tile.focused .focus-ring { border-color: #22c55e; }
+
+#grid.zoomed .tile { visibility: hidden; }
+#grid.zoomed .tile.focused {
+  visibility: visible;
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+}
+
+.tile .player,
+.tile iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  /* El iframe nunca debe robar el foco del teclado ni los clics. */
+  pointer-events: none;
+}
+
+.tile .status {
+  position: absolute;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.tile .status { bottom: 8px; }
+.tile .status:empty { display: none; }
+
+
+#message {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-content: center;
+  font-size: 16px;
+  white-space: pre-wrap;
+  text-align: center;
+}
+
+#help {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+}
+
+/* Sin señal / sin canal: pantalla azul de VHS. */
+.tile.nosignal {
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 4px),
+    #0000aa;
+  font-family: 'VT323', 'DejaVu Sans Mono', monospace;
+  color: #fff;
+  text-shadow: 2px 0 rgba(255, 0, 80, 0.5), -2px 0 rgba(0, 220, 255, 0.5);
+}
+.tile.nosignal .player,
+.tile.nosignal iframe { visibility: hidden; }
+.tile.nosignal::before {
+  content: attr(data-channel);
+  position: absolute;
+  top: 6%;
+  right: 6%;
+  font-size: clamp(16px, 4vmin, 48px);
+}
+.tile.nosignal::after {
+  content: attr(data-nosignal);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(18px, 5vmin, 64px);
+  letter-spacing: 0.1em;
+}
+.tile.nosignal .status { font-family: system-ui, sans-serif; text-shadow: none; }
+
+/* OSD de volumen: verde fósforo, grande, sobre toda la ventana (estilo Sony Trinitron). */
+.osd {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  font-family: 'VT323', 'DejaVu Sans Mono', monospace;
+  color: #3cff3c;
+  text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 0 0 12px rgba(60, 255, 60, 0.6);
+}
+.osd[hidden] { display: none; }
+#osd {
+  left: 6vw;
+  right: 6vw;
+  bottom: 10vh;
+}
+
+/* OSD de canal: número grande y nombre debajo, esquina superior derecha. */
+#osd-channel {
+  top: 5vh;
+  right: 4vw;
+  max-width: 60vw;
+  text-align: right;
+  line-height: 1;
+}
+.osd-number {
+  font-size: clamp(56px, 14vh, 180px);
+  letter-spacing: 0.06em;
+}
+.osd-name {
+  margin-top: 1vh;
+  font-size: clamp(24px, 5vh, 64px);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#osd-channel.muted .osd-name::after { content: ' · MUTE'; }
+.osd-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: clamp(40px, 9vh, 120px);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  margin-bottom: 2vh;
+}
+.osd-bar {
+  display: flex;
+  gap: 0.5vw;
+  height: clamp(30px, 8vh, 100px);
+}
+.osd-bar span {
+  flex: 1;
+  border: 2px solid #000;
+  background: rgba(60, 255, 60, 0.12);
+}
+.osd-bar span.on {
+  background: #3cff3c;
+  box-shadow: 0 0 10px rgba(60, 255, 60, 0.7);
+}
