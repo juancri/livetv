@@ -82,6 +82,7 @@ async function createWindow() {
   const win = new BrowserWindow({
     width: 1600,
     height: 900,
+    fullscreen: true,
     backgroundColor: '#000000',
     autoHideMenuBar: true,
     title: 'LiveTV',
