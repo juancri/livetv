@@ -57,7 +57,7 @@ function setNoSignal(tile, text) {
 
 // OSD verde de canal en la esquina superior derecha de la ventana.
 function showChannelOsd(tile) {
-  channelOsd.number.textContent = tile.el.dataset.channel;
+  channelOsd.number.textContent = tile.number;
   channelOsd.name.textContent = tile.name;
   channelOsd.el.classList.toggle('muted', muted);
   channelOsd.el.hidden = false;
@@ -202,7 +202,6 @@ function buildGrid(streams, configColumns) {
   streams.forEach((stream, i) => {
     const el = document.createElement('div');
     el.className = 'tile';
-    el.dataset.channel = `CH ${String(i + 1).padStart(2, '0')}`;
     const playerHost = document.createElement('div');
     const statusEl = document.createElement('div');
     statusEl.className = 'status';
@@ -212,7 +211,9 @@ function buildGrid(streams, configColumns) {
     grid.append(el);
 
     const name = stream.name || stream.url || stream.channel || 'Sin canal';
-    const tile = { stream, name, el, playerHost, statusEl, player: null, ready: false };
+    el.dataset.channel = name;
+    const number = `CH ${String(i + 1).padStart(2, '0')}`;
+    const tile = { stream, name, number, el, playerHost, statusEl, player: null, ready: false };
     el.addEventListener('click', () => setFocus(i));
     tiles.push(tile);
     createPlayer(tile);

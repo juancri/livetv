@@ -107,6 +107,10 @@ html, body {
   position: absolute;
   top: 6%;
   right: 6%;
+  max-width: 88%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: clamp(16px, 4vmin, 48px);
 }
 .tile.nosignal::after {
