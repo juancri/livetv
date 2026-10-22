@@ -35,6 +35,15 @@ html, body {
 }
 .tile.focused .focus-ring { border-color: #22c55e; }
 
+/* Canal sin señal fuera del mosaico. Se saca del flujo de la grilla en vez de
+   usar display: none para que el reproductor siga cargando y pueda volver. */
+.tile.offline {
+  position: fixed;
+  left: -10000px;
+  width: 320px;
+  height: 180px;
+}
+
 #grid.zoomed .tile { visibility: hidden; }
 #grid.zoomed .tile.focused {
   visibility: visible;

@@ -27,6 +27,10 @@ const ytReady = new Promise((resolve) => {
 const tiles = [];
 let focusIndex = 0;
 let columns = 1;
+let configColumns = null;
+// Índices de los tiles en el mosaico, en orden; los canales sin señal quedan fuera.
+let visible = [];
+let showOffline = false;
 // Volumen y silencio son globales, como en un televisor: se mantienen al cambiar de canal.
 let volume = 100;
 let muted = false;
@@ -52,7 +56,19 @@ function setStatus(tile, text) {
 // Pantalla azul tipo VHS para canales sin señal o sin configurar.
 function setNoSignal(tile, text) {
   tile.el.classList.toggle('nosignal', !!text);
-  if (text) tile.el.dataset.nosignal = text;
+  if (text) {
+    tile.el.dataset.nosignal = text;
+    setOffline(tile, true);
+  }
+}
+
+// Un canal sin señal sale del mosaico hasta que vuelva a reproducir. No basta
+// con la pantalla azul: cada reintento la quita mientras carga y la grilla
+// saltaría cada 30 s.
+function setOffline(tile, offline) {
+  if (tile.offline === offline) return;
+  tile.offline = offline;
+  if (tiles.includes(tile)) layout();
 }
 
 // OSD verde de canal en la esquina superior derecha de la ventana.
@@ -79,7 +95,7 @@ function applyAudio() {
 }
 
 function setFocus(i) {
-  focusIndex = (i + tiles.length) % tiles.length;
+  focusIndex = i;
   tiles.forEach((tile, j) => {
     tile.el.classList.toggle('focused', j === focusIndex);
   });
@@ -173,6 +189,7 @@ function onStateChange(tile, state) {
     case YT.PlayerState.PLAYING:
       setStatus(tile, '');
       setNoSignal(tile, null);
+      setOffline(tile, false);
       // YouTube arranca silenciado si el iframe aún no tenía activación de
       // usuario al hacer autoplay; reaplicar el audio ya reproduciendo.
       applyAudio();
@@ -192,13 +209,7 @@ function onStateChange(tile, state) {
   }
 }
 
-function buildGrid(streams, configColumns) {
-  const n = streams.length;
-  columns = configColumns || Math.ceil(Math.sqrt(n));
-  const rows = Math.ceil(n / columns);
-  grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
-  grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-
+function buildGrid(streams) {
   streams.forEach((stream, i) => {
     const el = document.createElement('div');
     el.className = 'tile';
@@ -213,37 +224,60 @@ function buildGrid(streams, configColumns) {
     const name = stream.name || stream.url || stream.channel || 'Sin canal';
     el.dataset.channel = name;
     const number = `CH ${String(i + 1).padStart(2, '0')}`;
-    const tile = { stream, name, number, el, playerHost, statusEl, player: null, ready: false };
+    const tile = { stream, name, number, el, playerHost, statusEl, player: null, ready: false, offline: false };
     el.addEventListener('click', () => setFocus(i));
     tiles.push(tile);
-    createPlayer(tile);
   });
+  layout();
+  tiles.forEach(createPlayer);
+}
+
+// Arma la grilla con los tiles visibles. Los ocultos no se destruyen: siguen
+// reintentando fuera de pantalla y vuelven al mosaico al reproducir.
+function layout() {
+  visible = tiles.flatMap((tile, i) => (showOffline || !tile.offline ? [i] : []));
+  // Si ningún canal tiene señal, mostrar todos en vez de una pantalla negra.
+  if (!visible.length) visible = tiles.map((_, i) => i);
+  tiles.forEach((tile, i) => tile.el.classList.toggle('offline', !visible.includes(i)));
+
+  const n = visible.length;
+  columns = configColumns || Math.ceil(Math.sqrt(n));
+  const rows = Math.ceil(n / columns);
+  grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+  grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
   // Celdas sobrantes de la grilla: sin canal configurado.
-  for (let i = n; i < columns * rows; i++) {
+  grid.querySelectorAll('.empty').forEach((el) => el.remove());
+  for (let k = n; k < columns * rows; k++) {
     const el = document.createElement('div');
     el.className = 'tile nosignal empty';
-    el.dataset.channel = `CH ${String(i + 1).padStart(2, '0')}`;
+    el.dataset.channel = `CH ${String(tiles.length + k - n + 1).padStart(2, '0')}`;
     el.dataset.nosignal = 'SIN CANAL';
     grid.append(el);
+  }
+
+  // Si el canal con foco salió del mosaico, pasar al siguiente visible.
+  if (tiles[focusIndex]?.el.classList.contains('focused') && !visible.includes(focusIndex)) {
+    setFocus(visible.find((i) => i > focusIndex) ?? visible[0]);
   }
 }
 
 function moveFocus(dx, dy) {
-  const n = tiles.length;
+  const n = visible.length;
+  const pos = visible.indexOf(focusIndex);
   if (dx) {
-    setFocus(focusIndex + dx);
+    setFocus(visible[(pos + dx + n) % n]);
     return;
   }
   const rows = Math.ceil(n / columns);
-  const col = focusIndex % columns;
-  let row = Math.floor(focusIndex / columns);
+  const col = pos % columns;
+  let row = Math.floor(pos / columns);
   // Avanza filas con wrap, saltando celdas vacías de la última fila.
   for (let k = 0; k < rows; k++) {
     row = (row + dy + rows) % rows;
     const target = row * columns + col;
     if (target < n) {
-      setFocus(target);
+      setFocus(visible[target]);
       return;
     }
   }
@@ -276,6 +310,10 @@ function onKey(e) {
       changeVolume(-VOLUME_STEP);
       break;
     case 'r': createPlayer(tile); break;
+    case 's':
+      showOffline = !showOffline;
+      layout();
+      break;
     case 'f': case 'F11': window.livetv.toggleFullscreen(); break;
     case '?': help.hidden = !help.hidden; break;
     case 'Escape':
@@ -285,7 +323,7 @@ function onKey(e) {
       break;
     case 'q': window.livetv.quit(); break;
     default:
-      if (/^[1-9]$/.test(e.key) && Number(e.key) <= tiles.length) setFocus(Number(e.key) - 1);
+      if (/^[1-9]$/.test(e.key) && visible.includes(Number(e.key) - 1)) setFocus(Number(e.key) - 1);
       else return;
   }
   e.preventDefault();
@@ -338,8 +376,10 @@ async function main() {
     return;
   }
   await ytReady;
-  buildGrid(streams, config.columns);
-  setFocus(0);
+  configColumns = config.columns;
+  buildGrid(streams);
+  // Un canal puede quedar fuera del mosaico ya al crearse (URL inválida, sin canal).
+  setFocus(visible[0]);
 }
 
 main();
