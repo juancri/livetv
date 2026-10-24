@@ -43,14 +43,44 @@ function channelUrl(value) {
   return `https://www.youtube.com/@${value.replace(/^@/, '')}`;
 }
 
-// embed/live_stream?channel= da Error 150 aunque el live sí sea embebible,
-// así que se busca el video del live actual: <canal>/live lo tiene como
-// canonical. Devuelve null si el canal no está transmitiendo.
-async function findLiveVideo(channel) {
-  const res = await fetch(`${channelUrl(channel)}/live`, { headers: { 'User-Agent': app.userAgentFallback } });
+async function fetchPage(url) {
+  const res = await fetch(url, { headers: { 'User-Agent': app.userAgentFallback } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const m = (await res.text()).match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/);
-  return m ? m[1] : null;
+  return res.text();
+}
+
+// embed/live_stream?channel= da Error 150 aunque el live sí sea embebible,
+// así que se busca el video del live: <canal>/live lo tiene como canonical.
+// Es el live principal; si el canal transmite varios a la vez, el resto sale
+// de la pestaña <canal>/streams (los que tienen el badge EN VIVO). Devuelve
+// [{ id, title }], vacío si el canal no está transmitiendo.
+async function findLives(channel) {
+  const base = channelUrl(channel);
+  const [live, streams] = await Promise.all([
+    fetchPage(`${base}/live`),
+    fetchPage(`${base}/streams`),
+  ]);
+  const lives = [];
+  const main = live.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/);
+  if (main) lives.push({ id: main[1], title: '' });
+
+  const data = streams.match(/var ytInitialData = (\{.*?\});<\/script>/s);
+  if (!data) return lives;
+  (function walk(o) {
+    if (!o || typeof o !== 'object') return;
+    const v = o.lockupViewModel;
+    if (v) {
+      if (JSON.stringify(v.contentImage).includes('THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE')) {
+        const title = v.metadata?.lockupMetadataViewModel?.title?.content || '';
+        const found = lives.find((l) => l.id === v.contentId);
+        if (found) found.title = title;
+        else lives.push({ id: v.contentId, title });
+      }
+      return;
+    }
+    Object.values(o).forEach(walk);
+  })(JSON.parse(data[1]));
+  return lives;
 }
 
 // Los embeds de YouTube fallan desde file:// (sin Referer/origin válido),
@@ -106,7 +136,7 @@ async function createWindow() {
 }
 
 ipcMain.handle('get-config', () => loadConfig());
-ipcMain.handle('find-live', (_e, channel) => findLiveVideo(channel));
+ipcMain.handle('find-lives', (_e, channel) => findLives(channel));
 ipcMain.on('toggle-fullscreen', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   win.setFullScreen(!win.isFullScreen());
