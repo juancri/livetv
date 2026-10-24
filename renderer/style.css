@@ -87,6 +87,8 @@ html, body {
   white-space: pre-wrap;
   text-align: center;
 }
+/* El display: grid de arriba anula [hidden]; sin esto la capa tapa los clics del mosaico. */
+#message[hidden] { display: none; }
 
 #help {
   position: fixed;
