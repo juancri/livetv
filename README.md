@@ -41,6 +41,7 @@ Los canales sin señal (error, live terminado, embed deshabilitado) y las celdas
 | m | silenciar/reactivar el audio (global) |
 | + / − | volumen global, se mantiene al cambiar de canal (OSD en pantalla; quita el silencio) |
 | r | recargar el stream enfocado |
+| Shift+H | ocultar el stream enfocado y cerrar su reproductor (pide confirmación: H/Enter sí, otra tecla no); vuelve al reiniciar la app |
 | f / F11 | pantalla completa |
 | ? | ayuda |
 | Esc | cerrar ampliación/ayuda, o salir |

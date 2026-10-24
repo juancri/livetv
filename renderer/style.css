@@ -171,6 +171,25 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Confirmación de ocultar: centrada sobre todo el mosaico. */
+#osd-confirm {
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  line-height: 1.1;
+  background: rgba(0, 0, 0, 0.5);
+}
+#osd-confirm[hidden] { display: none; }
+.osd-confirm-title {
+  font-size: clamp(48px, 12vh, 160px);
+  letter-spacing: 0.06em;
+}
+.osd-confirm-keys {
+  font-size: clamp(24px, 5vh, 64px);
+  letter-spacing: 0.04em;
+}
+
 #osd-channel.muted .osd-name::after { content: ' · MUTE'; }
 .osd-row {
   display: flex;

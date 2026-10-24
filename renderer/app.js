@@ -2,6 +2,7 @@ const ENDED_RETRY_MS = 30000;
 // Cada cuánto se buscan lives nuevos en los canales que ya están transmitiendo.
 const LIVES_POLL_MS = 120000;
 const CHANNEL_OSD_MS = 3000;
+const CONFIRM_MS = 5000;
 const VOLUME_STEP = 5;
 const OSD_SEGMENTS = 50;
 const OSD_MS = 2500;
@@ -21,6 +22,13 @@ const channelOsd = {
   name: document.querySelector('#osd-channel .osd-name'),
   timer: null,
 };
+const confirmOsd = {
+  el: document.getElementById('osd-confirm'),
+  title: document.querySelector('#osd-confirm .osd-confirm-title'),
+  timer: null,
+};
+// Tile que espera confirmación para ocultarse (Shift+H).
+let pendingHide = null;
 
 const ytReady = new Promise((resolve) => {
   window.onYouTubeIframeAPIReady = resolve;
@@ -183,25 +191,26 @@ function syncLives(group) {
       const ids = lives.map((l) => l.id);
       const shown = (id) => group.tiles.some((t) => t.videoId === id);
       group.tiles.slice(1).filter((t) => t.failed && !ids.includes(t.videoId)).forEach(removeTile);
-      if (!primary.videoId || (primary.failed && !ids.includes(primary.videoId))) {
+      if (!primary.hidden && (!primary.videoId || (primary.failed && !ids.includes(primary.videoId)))) {
         primary.videoId = ids.find((id) => !shown(id)) || null;
         createPlayer(primary);
       }
-      group.tiles.filter((t) => t.failed).forEach(createPlayer);
+      group.tiles.filter((t) => t.failed && !t.hidden).forEach(createPlayer);
       const max = group.stream.max || Infinity;
-      lives.filter((l) => !shown(l.id)).slice(0, max - group.tiles.length).forEach((l) => addTile(group, l));
+      lives.filter((l) => !shown(l.id) && !group.hiddenIds.has(l.id))
+        .slice(0, max - group.tiles.length).forEach((l) => addTile(group, l));
     })
     .catch((err) => {
       if (group.sync !== sync) return;
       console.warn(`No se pudo buscar el live de ${group.stream.channel}:`, err);
-      if (!primary.player) {
+      if (!primary.player && !primary.hidden) {
         setNoSignal(primary, 'SIN SEÑAL');
         setStatus(primary, 'Reintentando…');
       }
     })
     .finally(() => {
       if (group.sync !== sync) return;
-      const retry = group.tiles.some((t) => t.failed || !t.videoId);
+      const retry = group.tiles.some((t) => !t.hidden && (t.failed || !t.videoId));
       group.timer = setTimeout(() => syncLives(group), retry ? ENDED_RETRY_MS : LIVES_POLL_MS);
     });
 }
@@ -243,7 +252,7 @@ function makeTile(group) {
   el.append(playerHost, statusEl, ring);
   const tile = {
     group, stream: group.stream, el, playerHost, statusEl,
-    player: null, ready: false, offline: false, failed: false, videoId: null, title: '',
+    player: null, ready: false, offline: false, failed: false, hidden: false, videoId: null, title: '',
   };
   el.addEventListener('click', () => setFocus(tiles.indexOf(tile)));
   return tile;
@@ -290,10 +299,46 @@ function removeTile(tile) {
   layout();
 }
 
+// Oculta un stream hasta reiniciar la app y cierra su reproductor. Un live
+// extra cierra su tile; el tile fijo de un canal queda oculto sin player, y
+// los demás lives del canal siguen apareciendo como tiles extra.
+function hideTile(tile) {
+  const { group } = tile;
+  if (tile.videoId) group.hiddenIds.add(tile.videoId);
+  if (tile !== group.tiles[0]) {
+    removeTile(tile);
+    return;
+  }
+  clearTimeout(tile.retryTimer);
+  if (tile.player) tile.player.destroy();
+  tile.player = null;
+  tile.ready = false;
+  tile.hidden = true;
+  tile.playerHost.replaceChildren();
+  layout();
+}
+
+function askHide(tile) {
+  // No se oculta el último stream: el mosaico quedaría vacío.
+  if (tiles.filter((t) => !t.hidden).length <= 1) return;
+  pendingHide = tile;
+  confirmOsd.title.textContent = `¿OCULTAR ${tile.number}?`;
+  confirmOsd.el.hidden = false;
+  clearTimeout(confirmOsd.timer);
+  confirmOsd.timer = setTimeout(() => closeConfirm(), CONFIRM_MS);
+}
+
+function closeConfirm() {
+  pendingHide = null;
+  confirmOsd.el.hidden = true;
+  clearTimeout(confirmOsd.timer);
+}
+
 function buildGrid(streams) {
   streams.forEach((stream, index) => {
     const name = stream.name || stream.url || stream.channel || 'Sin canal';
-    const group = { stream, index, name, tiles: [], timer: null, sync: null };
+    // hiddenIds: lives ocultados con Shift+H, para que syncLives no los vuelva a abrir.
+    const group = { stream, index, name, tiles: [], hiddenIds: new Set(), timer: null, sync: null };
     const tile = makeTile(group);
     group.tiles.push(tile);
     groups.push(group);
@@ -315,9 +360,10 @@ function buildGrid(streams) {
 // Arma la grilla con los tiles visibles. Los ocultos no se destruyen: siguen
 // reintentando fuera de pantalla y vuelven al mosaico al reproducir.
 function layout() {
-  visible = tiles.flatMap((tile, i) => (showOffline || !tile.offline ? [i] : []));
+  const shown = (tile) => !tile.hidden && (showOffline || !tile.offline);
+  visible = tiles.flatMap((tile, i) => (shown(tile) ? [i] : []));
   // Si ningún canal tiene señal, mostrar todos en vez de una pantalla negra.
-  if (!visible.length) visible = tiles.map((_, i) => i);
+  if (!visible.length) visible = tiles.flatMap((tile, i) => (tile.hidden ? [] : [i]));
   tiles.forEach((tile, i) => tile.el.classList.toggle('offline', !visible.includes(i)));
 
   const n = visible.length;
@@ -376,6 +422,14 @@ function onKey(e) {
     if (e.key === 'q' || e.key === 'Escape') window.livetv.quit();
     return;
   }
+  // Confirmación de Shift+H: H o Enter oculta; cualquier otra tecla cancela.
+  if (pendingHide) {
+    const tile = pendingHide;
+    closeConfirm();
+    if ((e.key === 'H' || e.key === 'Enter') && tiles.includes(tile)) hideTile(tile);
+    e.preventDefault();
+    return;
+  }
   const tile = tiles[focusIndex];
   const zoomed = grid.classList.contains('zoomed');
   switch (e.key) {
@@ -401,6 +455,7 @@ function onKey(e) {
       createPlayer(tile);
       if (tile.stream.channel) syncLives(tile.group);
       break;
+    case 'H': askHide(tile); break;
     case 's':
       showOffline = !showOffline;
       layout();
