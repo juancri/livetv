@@ -34,6 +34,8 @@ html, body {
   pointer-events: none;
 }
 .tile.focused .focus-ring { border-color: #22c55e; }
+/* Ampliado solo hay un canal en pantalla: el borde de foco sobra. */
+#grid.zoomed .tile.focused .focus-ring { border-color: transparent; }
 
 /* Canal sin señal fuera del mosaico. Se saca del flujo de la grilla en vez de
    usar display: none para que el reproductor siga cargando y pueda volver. */
