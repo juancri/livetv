@@ -26,7 +26,9 @@ La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `
 - `url`: `watch?v=`, `youtu.be/`, `/live/`, `/embed/` o el ID de 11 caracteres.
 - `channel`: ID del canal (`UC…`), handle (`@nombre`) o URL del canal; sigue automáticamente el live actual. Si el canal transmite varios lives a la vez, cada uno ocupa su propio tile (`CH 07`, `CH 07-2`, …), que se cierra cuando ese live termina. Los lives nuevos se detectan cada 2 minutos.
 - `max`: opcional, con `channel`; tope de tiles (lives simultáneos) para ese canal.
-- Sin `url` ni `channel`: tile vacío "SIN CANAL".
+- `polymarket`: slug o URL (`polymarket.com/event/<slug>`) de un evento de Polymarket. El tile no tiene video: muestra la probabilidad de cada outcome, su variación del día y un sparkline de 24 h, actualizados en vivo. Ejemplo: `{ "name": "Brasil 2ª vuelta", "polymarket": "brazil-presidential-election" }`.
+- `outcomes`: opcional, con `polymarket`; cuántos outcomes mostrar (por defecto 4, los más probables).
+- Sin `url`, `channel` ni `polymarket`: tile vacío "SIN CANAL".
 - `columns`: opcional; por defecto `ceil(sqrt(N))`.
 
 Los canales sin señal (error, live terminado, embed deshabilitado) y las celdas vacías se muestran con pantalla azul estilo VHS. Los `channel` y los lives terminados se reintentan cada 30 s.

@@ -114,7 +114,8 @@ html, body {
   text-shadow: 2px 0 rgba(255, 0, 80, 0.5), -2px 0 rgba(0, 220, 255, 0.5);
 }
 .tile.nosignal .player,
-.tile.nosignal iframe { visibility: hidden; }
+.tile.nosignal iframe,
+.tile.nosignal .market { visibility: hidden; }
 .tile.nosignal::before {
   content: attr(data-channel);
   position: absolute;
@@ -136,6 +137,80 @@ html, body {
   letter-spacing: 0.1em;
 }
 .tile.nosignal .status { font-family: system-ui, sans-serif; text-shadow: none; }
+
+/* Tile de Polymarket: probabilidades en verde fósforo sobre negro con scanlines.
+   Los tamaños van en unidades del contenedor (cqh/cqw) para escalar con el tile,
+   y el de cada row se reparte según la cantidad de rows (--rows). */
+.market {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  display: flex;
+  flex-direction: column;
+  gap: 2cqh;
+  padding: 4% 5%;
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.35) 0 2px, transparent 2px 4px),
+    #031203;
+  font-family: 'VT323', 'DejaVu Sans Mono', monospace;
+  color: #3cff3c;
+  text-shadow: 0 0 8px rgba(60, 255, 60, 0.5);
+  overflow: hidden;
+}
+.market-title {
+  font-size: min(8cqh, 5cqw);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.market-rows {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+}
+.market-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  column-gap: 1em;
+  font-size: min(calc(68cqh / var(--rows) / 3.8), 5cqw);
+  line-height: 1;
+}
+.market-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.market-pct { font-size: 1.6em; }
+.market-delta { min-width: 4ch; text-align: right; font-size: 0.8em; }
+.market-delta.up { color: #3cff3c; }
+.market-delta.down { color: #ff4a3c; text-shadow: 0 0 8px rgba(255, 74, 60, 0.5); }
+.market-bar {
+  grid-column: 1 / -1;
+  height: 0.25em;
+  margin-top: 0.2em;
+  background: rgba(60, 255, 60, 0.12);
+}
+.market-bar span {
+  display: block;
+  height: 100%;
+  background: #3cff3c;
+  box-shadow: 0 0 8px rgba(60, 255, 60, 0.6);
+}
+.market-spark {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 1.4em;
+  margin-top: 0.2em;
+  overflow: visible;
+}
+.market-spark polyline {
+  fill: none;
+  stroke: #3cff3c;
+  stroke-width: 2;
+}
+.market-footer {
+  font-size: min(5cqh, 3.5cqw);
+  opacity: 0.7;
+}
 
 /* OSD de volumen: verde fósforo, grande, sobre toda la ventana (estilo Sony Trinitron). */
 .osd {

@@ -85,6 +85,54 @@ async function findLives(channel) {
   return lives;
 }
 
+// Slug de un evento de Polymarket a partir del slug o de su URL (/event/<slug>).
+function polymarketSlug(value) {
+  const m = value.match(/polymarket\.com\/event\/([^/?#]+)/);
+  return m ? m[1] : value;
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url, { headers: { 'User-Agent': app.userAgentFallback } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// Outcomes de un evento de Polymarket, de mayor a menor probabilidad. Un evento
+// con varios mercados (candidatos) da un row por mercado abierto, con el token
+// del "Yes"; un evento de un solo mercado da un row por outcome. Si ya se
+// resolvió, closed es true y los precios quedan en 0 o 1.
+async function findMarket(value) {
+  const slug = polymarketSlug(value);
+  const [event] = await fetchJson(`https://gamma-api.polymarket.com/events?slug=${encodeURIComponent(slug)}`);
+  if (!event) throw new Error(`No existe el evento ${slug}`);
+  const parse = (s) => (s ? JSON.parse(s) : []);
+  const markets = event.markets || [];
+  const closed = !!event.closed || markets.every((m) => m.closed);
+  let rows;
+  if (markets.length === 1) {
+    const [m] = markets;
+    const tokens = parse(m.clobTokenIds);
+    const prices = parse(m.outcomePrices);
+    rows = parse(m.outcomes).map((label, k) => ({ label, tokenId: tokens[k], price: Number(prices[k]) }));
+  } else {
+    rows = markets.filter((m) => closed || !m.closed).map((m) => ({
+      label: m.groupItemTitle || m.question,
+      tokenId: parse(m.clobTokenIds)[0],
+      price: Number(parse(m.outcomePrices)[0]),
+    }));
+  }
+  // Los eventos traen mercados de relleno ("Person O") sin token ni precio.
+  rows = rows.filter((r) => r.tokenId && Number.isFinite(r.price));
+  rows.sort((a, b) => b.price - a.price);
+  return { title: event.title, closed, rows };
+}
+
+// Probabilidad del último día de un outcome: [{ t, p }], t en segundos.
+async function priceHistory(tokenId) {
+  const data = await fetchJson(`https://clob.polymarket.com/prices-history?market=${tokenId}&interval=1d&fidelity=5`);
+  return data.history || [];
+}
+
 // Los embeds de YouTube fallan desde file:// (sin Referer/origin válido),
 // así que el renderer se sirve desde un HTTP local.
 function startServer() {
@@ -139,6 +187,8 @@ async function createWindow() {
 
 ipcMain.handle('get-config', () => loadConfig());
 ipcMain.handle('find-lives', (_e, channel) => findLives(channel));
+ipcMain.handle('find-market', (_e, value) => findMarket(value));
+ipcMain.handle('price-history', (_e, tokenId) => priceHistory(tokenId));
 ipcMain.on('toggle-fullscreen', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   win.setFullScreen(!win.isFullScreen());

@@ -6,6 +6,14 @@ const CONFIRM_MS = 5000;
 const VOLUME_STEP = 5;
 const OSD_SEGMENTS = 50;
 const OSD_MS = 2500;
+const MARKET_WS = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
+const MARKET_PING_MS = 10000;
+const MARKET_RECONNECT_MS = 5000;
+const MARKET_ROWS = 4;
+// Como polymarket.com: con un spread mayor se muestra el último trade, no el punto medio.
+const MARKET_MAX_SPREAD = 0.1;
+const DAY_S = 86400;
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const grid = document.getElementById('grid');
 const help = document.getElementById('help');
@@ -119,6 +127,7 @@ function setFocus(i) {
 function createPlayer(tile) {
   clearTimeout(tile.retryTimer);
   if (tile.player) tile.player.destroy();
+  closeMarket(tile);
   tile.player = null;
   tile.ready = false;
   tile.failed = false;
@@ -126,6 +135,10 @@ function createPlayer(tile) {
   setNoSignal(tile, null);
 
   const { stream } = tile;
+  if (stream.polymarket) {
+    createMarket(tile);
+    return;
+  }
   if (!stream.url && !stream.channel) {
     setNoSignal(tile, 'SIN CANAL');
     setStatus(tile, '');
@@ -215,6 +228,190 @@ function syncLives(group) {
     });
 }
 
+// Tile de Polymarket: no tiene reproductor, muestra la probabilidad de cada
+// outcome con su sparkline del día. Los precios llegan por el WebSocket del
+// CLOB; el evento completo se vuelve a pedir cada LIVES_POLL_MS para rearmar
+// los rows (mercados cerrados, cambios de orden) y detectar que se resolvió.
+function createMarket(tile) {
+  const market = tile.market = { rows: [], ws: null, timer: null, ping: null, reconnect: null, loaded: false };
+  setStatus(tile, 'Cargando…');
+  loadMarket(tile, market);
+}
+
+function loadMarket(tile, market) {
+  const { stream } = tile;
+  window.livetv.findMarket(stream.polymarket)
+    .then(async (data) => {
+      const rows = data.rows.slice(0, stream.outcomes || MARKET_ROWS);
+      const histories = await Promise.all(rows.map((r) => window.livetv.priceHistory(r.tokenId).catch(() => [])));
+      if (tile.market !== market) return;
+      market.loaded = true;
+      stopMarketSocket(market);
+      market.rows = rows.map((r, k) => ({ ...r, bid: null, ask: null, last: null, history: histories[k] }));
+      renderMarket(tile, market, data);
+      setStatus(tile, '');
+      setNoSignal(tile, null);
+      setOffline(tile, false);
+      if (data.closed) return;
+      connectMarket(tile, market);
+      market.timer = setTimeout(() => loadMarket(tile, market), LIVES_POLL_MS);
+    })
+    .catch((err) => {
+      if (tile.market !== market) return;
+      console.warn(`No se pudo leer el mercado ${stream.polymarket}:`, err);
+      // Con datos ya en pantalla se siguen mostrando; el WebSocket sigue vivo.
+      if (!market.loaded) {
+        setNoSignal(tile, 'SIN SEÑAL');
+        setStatus(tile, 'Reintentando…');
+      }
+      market.timer = setTimeout(() => loadMarket(tile, market), ENDED_RETRY_MS);
+    });
+}
+
+function closeMarket(tile) {
+  const { market } = tile;
+  if (!market) return;
+  tile.market = null;
+  clearTimeout(market.timer);
+  stopMarketSocket(market);
+}
+
+function stopMarketSocket(market) {
+  const { ws } = market;
+  market.ws = null;
+  clearInterval(market.ping);
+  clearTimeout(market.reconnect);
+  if (ws) ws.close();
+}
+
+function connectMarket(tile, market) {
+  const ws = market.ws = new WebSocket(MARKET_WS);
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ assets_ids: market.rows.map((r) => r.tokenId), type: 'market' }));
+    market.ping = setInterval(() => ws.send('PING'), MARKET_PING_MS);
+  };
+  ws.onmessage = (e) => {
+    let msgs;
+    try {
+      msgs = [].concat(JSON.parse(e.data));
+    } catch {
+      return; // PONG
+    }
+    msgs.forEach((m) => onMarketMessage(market, m));
+  };
+  ws.onclose = () => {
+    if (market.ws !== ws) return;
+    clearInterval(market.ping);
+    market.reconnect = setTimeout(() => connectMarket(tile, market), MARKET_RECONNECT_MS);
+  };
+}
+
+function onMarketMessage(market, msg) {
+  const row = (id) => market.rows.find((r) => r.tokenId === id);
+  const best = (levels, pick) => (levels?.length ? pick(...levels.map((l) => Number(l.price))) : null);
+  switch (msg.event_type) {
+    case 'book': {
+      const r = row(msg.asset_id);
+      if (!r) return;
+      r.bid = best(msg.bids, Math.max);
+      r.ask = best(msg.asks, Math.min);
+      updateRow(market, r);
+      break;
+    }
+    case 'price_change':
+      (msg.price_changes || []).forEach((c) => {
+        const r = row(c.asset_id);
+        if (!r) return;
+        r.bid = c.best_bid != null ? Number(c.best_bid) : r.bid;
+        r.ask = c.best_ask != null ? Number(c.best_ask) : r.ask;
+        updateRow(market, r);
+      });
+      break;
+    case 'last_trade_price': {
+      const r = row(msg.asset_id);
+      if (!r) return;
+      r.last = Number(msg.price);
+      updateRow(market, r);
+      break;
+    }
+  }
+}
+
+// Precio que muestra polymarket.com: punto medio del libro, o el último trade
+// si el spread es muy amplio.
+function updateRow(market, row) {
+  const mid = row.bid != null && row.ask != null && row.ask - row.bid <= MARKET_MAX_SPREAD
+    ? (row.bid + row.ask) / 2 : null;
+  const price = mid ?? row.last;
+  if (price == null || price === row.price) return;
+  row.price = price;
+  const t = Date.now() / 1000;
+  const lastPoint = row.history[row.history.length - 1];
+  // Un punto por minuto basta para el sparkline.
+  if (lastPoint && t - lastPoint.t < 60) lastPoint.p = price;
+  else row.history.push({ t, p: price });
+  renderRow(row);
+  market.footer.textContent = `EN VIVO · ${new Date().toLocaleTimeString('es-CL')}`;
+}
+
+function renderMarket(tile, market, data) {
+  const root = document.createElement('div');
+  root.className = 'market';
+  root.style.setProperty('--rows', market.rows.length);
+  const title = document.createElement('div');
+  title.className = 'market-title';
+  title.textContent = data.title;
+  const list = document.createElement('div');
+  list.className = 'market-rows';
+  market.rows.forEach((row) => {
+    const el = document.createElement('div');
+    el.className = 'market-row';
+    const label = document.createElement('span');
+    label.className = 'market-label';
+    label.textContent = row.label;
+    row.pctEl = document.createElement('span');
+    row.pctEl.className = 'market-pct';
+    row.deltaEl = document.createElement('span');
+    row.deltaEl.className = 'market-delta';
+    const bar = document.createElement('div');
+    bar.className = 'market-bar';
+    row.barEl = document.createElement('span');
+    bar.append(row.barEl);
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'market-spark');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    row.lineEl = document.createElementNS(SVG_NS, 'polyline');
+    row.lineEl.setAttribute('vector-effect', 'non-scaling-stroke');
+    svg.append(row.lineEl);
+    el.append(label, row.pctEl, row.deltaEl, bar, svg);
+    list.append(el);
+    renderRow(row);
+  });
+  market.footer = document.createElement('div');
+  market.footer.className = 'market-footer';
+  market.footer.textContent = data.closed ? 'RESULTADO FINAL' : `EN VIVO · ${new Date().toLocaleTimeString('es-CL')}`;
+  root.append(title, list, market.footer);
+  tile.playerHost.replaceChildren(root);
+}
+
+function renderRow(row) {
+  const { price, history } = row;
+  row.pctEl.textContent = `${Math.round(price * 100)}%`;
+  row.barEl.style.width = `${price * 100}%`;
+  // Variación del día en puntos porcentuales.
+  const delta = history.length ? (price - history[0].p) * 100 : 0;
+  row.deltaEl.textContent = Math.abs(delta) < 0.05 ? '' : `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}`;
+  row.deltaEl.classList.toggle('up', delta > 0);
+  row.deltaEl.classList.toggle('down', delta < 0);
+  // Eje Y fijo de 0 a 100 % para que los rows se puedan comparar.
+  const end = Date.now() / 1000;
+  row.lineEl.setAttribute('points', history
+    .filter((h) => h.t >= end - DAY_S)
+    .map((h) => `${(100 - (end - h.t) / DAY_S * 100).toFixed(2)},${(100 - h.p * 100).toFixed(2)}`)
+    .join(' '));
+}
+
 function onStateChange(tile, state) {
   switch (state) {
     case YT.PlayerState.PLAYING:
@@ -252,7 +449,7 @@ function makeTile(group) {
   el.append(playerHost, statusEl, ring);
   const tile = {
     group, stream: group.stream, el, playerHost, statusEl,
-    player: null, ready: false, offline: false, failed: false, hidden: false, videoId: null, title: '',
+    player: null, market: null, ready: false, offline: false, failed: false, hidden: false, videoId: null, title: '',
   };
   el.addEventListener('click', () => setFocus(tiles.indexOf(tile)));
   return tile;
@@ -290,6 +487,7 @@ function removeTile(tile) {
   const { group } = tile;
   clearTimeout(tile.retryTimer);
   if (tile.player) tile.player.destroy();
+  closeMarket(tile);
   tile.el.remove();
   tiles.splice(tiles.indexOf(tile), 1);
   group.tiles.splice(group.tiles.indexOf(tile), 1);
@@ -311,6 +509,7 @@ function hideTile(tile) {
   }
   clearTimeout(tile.retryTimer);
   if (tile.player) tile.player.destroy();
+  closeMarket(tile);
   tile.player = null;
   tile.ready = false;
   tile.hidden = true;
@@ -336,7 +535,7 @@ function closeConfirm() {
 
 function buildGrid(streams) {
   streams.forEach((stream, index) => {
-    const name = stream.name || stream.url || stream.channel || 'Sin canal';
+    const name = stream.name || stream.url || stream.channel || stream.polymarket || 'Sin canal';
     // hiddenIds: lives ocultados con Shift+H, para que syncLives no los vuelva a abrir.
     const group = { stream, index, name, tiles: [], hiddenIds: new Set(), timer: null, sync: null };
     const tile = makeTile(group);

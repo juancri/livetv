@@ -16,6 +16,10 @@
     {
       "name": "France 24 English",
       "channel": "UCQfwfsi5VrQ8yKZ-UWmAEFg"
+    },
+    {
+      "name": "Brasil 2ª vuelta",
+      "polymarket": "brazil-presidential-election"
     }
   ]
 }
