@@ -62,7 +62,9 @@ async function findLives(channel) {
   ]);
   const lives = [];
   const main = live.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})"/);
-  if (main) lives.push({ id: main[1], title: '' });
+  // Sin live en curso, /live apunta al próximo live programado (isUpcoming en
+  // videoDetails): no cuenta hasta que empiece.
+  if (main && !live.includes('"isUpcoming":true')) lives.push({ id: main[1], title: '' });
 
   const data = streams.match(/var ytInitialData = (\{.*?\});<\/script>/s);
   if (!data) return lives;
