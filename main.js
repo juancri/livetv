@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, webFrameMain } = require('electron');
+const { app, BrowserWindow, ipcMain, session, webFrameMain } = require('electron');
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
@@ -157,8 +157,24 @@ function startServer() {
   });
 }
 
+// hls.js baja la playlist y los segmentos de un .m3u8 con XHR desde el origin
+// local, y muchos servidores HLS no mandan Access-Control-Allow-Origin. Se
+// agrega a las respuestas pedidas por el renderer (no por los iframes de YouTube).
+function allowHlsCors(origin) {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = details.responseHeaders || {};
+    const hasCors = Object.keys(headers).some((h) => h.toLowerCase() === 'access-control-allow-origin');
+    if (details.resourceType !== 'xhr' || hasCors || !details.frame?.url.startsWith(origin)) {
+      callback({});
+      return;
+    }
+    callback({ responseHeaders: { ...headers, 'Access-Control-Allow-Origin': ['*'] } });
+  });
+}
+
 async function createWindow() {
   const port = await startServer();
+  allowHlsCors(`http://127.0.0.1:${port}/`);
   const win = new BrowserWindow({
     width: 1600,
     height: 900,

@@ -84,6 +84,15 @@ function parseVideoId(url) {
   return null;
 }
 
+// Stream HLS directo (.m3u8), reproducido con un <video> en vez de YouTube.
+function isHls(url) {
+  try {
+    return new URL(url).pathname.toLowerCase().endsWith('.m3u8');
+  } catch {
+    return false;
+  }
+}
+
 function setStatus(tile, text) {
   tile.statusEl.textContent = text;
 }
@@ -168,6 +177,10 @@ function createPlayer(tile) {
     createMarket(tile);
     return;
   }
+  if (stream.url && isHls(stream.url)) {
+    createVideo(tile);
+    return;
+  }
   if (!stream.url && !stream.channel) {
     setNoSignal(tile, 'SIN CANAL');
     setStatus(tile, '');
@@ -209,6 +222,79 @@ function createPlayer(tile) {
   div.className = 'player';
   tile.playerHost.append(div);
   tile.player = new YT.Player(div, { videoId, playerVars, events });
+}
+
+// Tile de un stream HLS: un <video> con hls.js. tile.player es un adaptador
+// con la misma interfaz que usan applyAudio y destroy() del YT.Player.
+function createVideo(tile) {
+  const video = document.createElement('video');
+  video.className = 'player';
+  video.autoplay = true;
+  video.playsInline = true;
+  video.muted = true;
+  tile.playerHost.append(video);
+  setStatus(tile, 'Cargando…');
+
+  let hls = null;
+  // Tras destroy(), o con el tile cerrado u oculto, los eventos del video ya no cuentan.
+  const alive = () => tile.player === player && video.isConnected;
+  const fail = (text) => {
+    if (!alive()) return;
+    setNoSignal(tile, 'SIN SEÑAL');
+    setStatus(tile, text);
+    clearTimeout(tile.retryTimer);
+    tile.retryTimer = setTimeout(() => createPlayer(tile), ENDED_RETRY_MS);
+  };
+  const player = {
+    mute: () => { video.muted = true; },
+    unMute: () => { video.muted = false; },
+    setVolume: (v) => { video.volume = v / 100; },
+    destroy: () => {
+      if (hls) hls.destroy();
+      video.removeAttribute('src');
+      video.load();
+    },
+  };
+  tile.player = player;
+  tile.ready = true;
+
+  video.addEventListener('playing', () => {
+    setStatus(tile, '');
+    setNoSignal(tile, null);
+    setOffline(tile, false);
+  });
+  video.addEventListener('waiting', () => setStatus(tile, 'Buffering…'));
+  // Sin controles, una pausa nunca es intencional: retomar.
+  video.addEventListener('pause', () => {
+    if (alive() && !video.ended) video.play().catch(() => {});
+  });
+  video.addEventListener('ended', () => fail('Reintentando…'));
+  video.addEventListener('error', () => fail(`Error ${video.error?.code ?? ''}`.trim()));
+
+  const url = tile.stream.url;
+  if (window.Hls?.isSupported()) {
+    hls = new Hls();
+    let recovered = false;
+    hls.on(Hls.Events.ERROR, (_e, data) => {
+      if (!data.fatal) return;
+      // Un error de decodificación suele recuperarse sin recargar el stream.
+      if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) {
+        recovered = true;
+        hls.recoverMediaError();
+        return;
+      }
+      fail(`Error ${data.details}`);
+    });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = url;
+  } else {
+    fail('HLS no soportado');
+    return;
+  }
+  video.play().catch(() => {});
+  applyAudio();
 }
 
 // El live del tile terminó o falló: syncLives() lo reintenta, le asigna otro

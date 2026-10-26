@@ -23,7 +23,7 @@ La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `
 }
 ```
 
-- `url`: `watch?v=`, `youtu.be/`, `/live/`, `/embed/` o el ID de 11 caracteres.
+- `url`: `watch?v=`, `youtu.be/`, `/live/`, `/embed/` o el ID de 11 caracteres. También acepta un stream HLS directo (URL `.m3u8`), que se reproduce con hls.js; si termina o falla se reintenta cada 30 s.
 - `channel`: ID del canal (`UC…`), handle (`@nombre`) o URL del canal; sigue automáticamente el live actual. Si el canal transmite varios lives a la vez, cada uno ocupa su propio tile (`CH 07`, `CH 07-2`, …), que se cierra cuando ese live termina. Los lives nuevos se detectan cada 2 minutos.
 - `max`: opcional, con `channel`; tope de tiles (lives simultáneos) para ese canal.
 - `polymarket`: slug o URL (`polymarket.com/event/<slug>`) de un evento de Polymarket. El tile no tiene video: muestra la probabilidad de cada outcome, su variación del día y un sparkline de 24 h, actualizados en vivo. Ejemplo: `{ "name": "Brasil 2ª vuelta", "polymarket": "brazil-presidential-election" }`.
