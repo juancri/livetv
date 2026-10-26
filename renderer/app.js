@@ -6,6 +6,14 @@ const CONFIRM_MS = 5000;
 const VOLUME_STEP = 5;
 const OSD_SEGMENTS = 50;
 const OSD_MS = 2500;
+const ZOOM_MS = 1400;
+const ZOOM_EASING = 'cubic-bezier(.45, 0, .25, 1)';
+// Fracción de la animación en que el tile queda flotando delante del mosaico.
+const ZOOM_HOLD = [0.35, 0.5];
+// Al despegarse, el tile crece ZOOM_LIFT veces y se acerca al centro (ZOOM_PULL = 0.9: 10 %).
+const ZOOM_LIFT = 1.15;
+const ZOOM_PULL = 0.9;
+const PERSPECTIVE = 'perspective(1200px)';
 const MARKET_WS = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const MARKET_PING_MS = 10000;
 const MARKET_RECONNECT_MS = 5000;
@@ -52,6 +60,9 @@ let configColumns = null;
 // Índices de los tiles en el mosaico, en orden; los canales sin señal quedan fuera.
 let visible = [];
 let showOffline = false;
+// Canal ampliado a pantalla completa (Enter), y cierre de su animación en curso.
+let zoomed = false;
+let zoomEnd = null;
 // Volumen y silencio son globales, como en un televisor: se mantienen al cambiar de canal.
 let volume = 100;
 let muted = false;
@@ -605,6 +616,67 @@ function layout() {
   }
 }
 
+// Amplía o reduce el tile enfocado en dos pasos: primero se despega del
+// mosaico y queda flotando delante (el resto se desenfoca y oscurece), y luego
+// vuela hacia la cámara hasta cubrir la pantalla. Es un FLIP: el tile ya está en
+// pantalla completa (el iframe con su tamaño final) y se anima su transform
+// desde la celda. Se animan los tiles y no #grid: un ancestro con transform
+// rompería el position: fixed del tile ampliado.
+function setZoom(on) {
+  zoomEnd?.();
+  if (on === zoomed) return;
+  zoomed = on;
+  const tile = tiles[focusIndex];
+  grid.classList.remove('zoomed');
+  const r = tile.el.getBoundingClientRect();
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const dx = r.left + r.width / 2 - W / 2;
+  const dy = r.top + r.height / 2 - H / 2;
+  const sx = r.width / W;
+  const sy = r.height / H;
+  const cell = `${PERSPECTIVE} translate(${dx}px, ${dy}px) scale(${sx}, ${sy}) rotateY(0deg) rotateX(0deg)`;
+  // Despegado: algo más grande, un poco hacia el centro e inclinado hacia él.
+  const lifted = `${PERSPECTIVE} translate(${dx * ZOOM_PULL}px, ${dy * ZOOM_PULL}px) ` +
+    `scale(${sx * ZOOM_LIFT}, ${sy * ZOOM_LIFT}) ` +
+    `rotateY(${(Math.sign(dx) || 1) * -10}deg) rotateX(${(Math.sign(dy) || 1) * 6}deg)`;
+  const full = `${PERSPECTIVE} translate(0px, 0px) scale(1, 1) rotateY(0deg) rotateX(0deg)`;
+  // Al reducir se recorren los mismos keyframes al revés (Enter o Escape).
+  const frames = (list) => (on ? list : list.map((f) => ({ ...f, offset: 1 - f.offset })).reverse());
+  const step = (offset, props) => ({ offset, easing: ZOOM_EASING, ...props });
+  const opts = { duration: ZOOM_MS };
+  grid.classList.add('zoomed', 'zooming');
+  const others = [
+    ...visible.filter((i) => i !== focusIndex).map((i) => tiles[i].el),
+    ...grid.querySelectorAll('.empty'),
+  ];
+  const glow = '0 0 60px rgba(60, 255, 60, 0.35), 0 30px 80px rgba(0, 0, 0, 0.9)';
+  const anims = [
+    tile.el.animate(frames([
+      step(0, { transform: cell, boxShadow: '0 0 0 transparent, 0 0 0 transparent' }),
+      step(ZOOM_HOLD[0], { transform: lifted, boxShadow: glow }),
+      step(ZOOM_HOLD[1], { transform: lifted, boxShadow: glow }),
+      step(1, { transform: full, boxShadow: '0 0 0 transparent, 0 0 0 transparent' }),
+    ]), opts),
+    ...others.map((el) => el.animate(frames([
+      step(0, { transform: `${PERSPECTIVE} translateZ(0px)`, filter: 'blur(0px) brightness(1)', opacity: 1 }),
+      step(ZOOM_HOLD[0], { transform: `${PERSPECTIVE} translateZ(-80px)`, filter: 'blur(8px) brightness(0.45)', opacity: 1 }),
+      step(ZOOM_HOLD[1], { transform: `${PERSPECTIVE} translateZ(-80px)`, filter: 'blur(8px) brightness(0.45)', opacity: 1 }),
+      step(1, { transform: `${PERSPECTIVE} translateZ(-300px)`, filter: 'blur(16px) brightness(0.15)', opacity: 0 }),
+    ]), opts)),
+  ];
+  // Al terminar, o si se vuelve a pulsar Enter a medio camino, queda el estado final.
+  const end = zoomEnd = () => {
+    zoomEnd = null;
+    anims.forEach((a) => a.cancel());
+    grid.classList.remove('zooming');
+    if (!on) grid.classList.remove('zoomed');
+  };
+  anims[0].onfinish = () => {
+    if (zoomEnd === end) end();
+  };
+}
+
 function moveFocus(dx, dy) {
   const n = visible.length;
   const pos = visible.indexOf(focusIndex);
@@ -648,14 +720,13 @@ function onKey(e) {
     return;
   }
   const tile = tiles[focusIndex];
-  const zoomed = grid.classList.contains('zoomed');
   switch (e.key) {
     case 'ArrowLeft': case 'h': moveFocus(-1, 0); break;
     case 'ArrowRight': case 'l': moveFocus(1, 0); break;
     case 'ArrowUp': case 'k': moveFocus(0, -1); break;
     case 'ArrowDown': case 'j': moveFocus(0, 1); break;
     case 'Enter': case ' ':
-      grid.classList.toggle('zoomed');
+      setZoom(!zoomed);
       break;
     case 'm':
       muted = !muted;
@@ -680,7 +751,7 @@ function onKey(e) {
     case 'f': case 'F11': window.livetv.toggleFullscreen(); break;
     case '?': help.hidden = !help.hidden; break;
     case 'Escape':
-      if (zoomed) grid.classList.remove('zoomed');
+      if (zoomed) setZoom(false);
       else if (!help.hidden) help.hidden = true;
       else window.livetv.quit();
       break;

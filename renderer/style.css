@@ -47,6 +47,8 @@ html, body {
 }
 
 #grid.zoomed .tile { visibility: hidden; }
+/* Mientras anima la ampliación (setZoom) el resto del mosaico se ve hundirse. */
+#grid.zoomed.zooming .tile { visibility: visible; }
 #grid.zoomed .tile.focused {
   visibility: visible;
   position: fixed;
