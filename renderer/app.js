@@ -55,6 +55,9 @@ let showOffline = false;
 // Volumen y silencio son globales, como en un televisor: se mantienen al cambiar de canal.
 let volume = 100;
 let muted = false;
+// Último tile de video enfocado. Un tile de Polymarket no tiene audio: con el
+// foco en él sigue sonando este, en vez de quedar todo en silencio.
+let audioTile = null;
 
 // Acepta watch?v=, youtu.be/, /live/, /embed/, /shorts/ o un ID suelto.
 function parseVideoId(url) {
@@ -102,11 +105,25 @@ function showChannelOsd(tile) {
   channelOsd.timer = setTimeout(() => { channelOsd.el.hidden = true; }, CHANNEL_OSD_MS);
 }
 
+// Tile que suena: el enfocado o, si es de Polymarket, el último video enfocado.
+// Si ese ya no está (oculto con Shift+H o cerrado), el video visible más
+// cercano antes del foco.
+function audioSource() {
+  const focused = tiles[focusIndex];
+  if (!focused?.stream.polymarket) return focused;
+  if (!tiles.includes(audioTile) || audioTile.hidden) {
+    const videos = visible.map((i) => tiles[i]).filter((t) => !t.stream.polymarket);
+    audioTile = videos.filter((t) => tiles.indexOf(t) < focusIndex).pop() || videos[0] || null;
+  }
+  return audioTile;
+}
+
 function applyAudio() {
-  tiles.forEach((tile, i) => {
+  const source = audioSource();
+  tiles.forEach((tile) => {
     const p = tile.player;
     if (!tile.ready) return;
-    if (i === focusIndex && !muted) {
+    if (tile === source && !muted) {
       p.unMute();
       p.setVolume(volume);
     } else {
@@ -117,6 +134,7 @@ function applyAudio() {
 
 function setFocus(i) {
   focusIndex = i;
+  if (!tiles[i].stream.polymarket) audioTile = tiles[i];
   tiles.forEach((tile, j) => {
     tile.el.classList.toggle('focused', j === focusIndex);
   });
