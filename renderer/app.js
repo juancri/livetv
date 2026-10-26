@@ -36,7 +36,12 @@ const channelOsd = {
   el: document.getElementById('osd-channel'),
   number: document.querySelector('#osd-channel .osd-number'),
   name: document.querySelector('#osd-channel .osd-name'),
+  category: document.querySelector('#osd-channel .osd-category'),
   timer: null,
+};
+const menu = {
+  el: document.getElementById('osd-menu'),
+  list: document.querySelector('#osd-menu .osd-menu-list'),
 };
 const confirmOsd = {
   el: document.getElementById('osd-confirm'),
@@ -69,6 +74,15 @@ let muted = false;
 // Último tile de video enfocado. Un tile de Polymarket no tiene audio: con el
 // foco en él sigue sonando este, en vez de quedar todo en silencio.
 let audioTile = null;
+// Categorías de la config; el mosaico muestra una a la vez.
+let categories = [];
+let categoryIndex = 0;
+// Categoría resaltada en el menú (c), o null con el menú cerrado.
+let menuIndex = null;
+// Ocultos con Shift+H en cualquier categoría, hasta reiniciar: streams de la
+// config (por streamKey) y lives de canales (por videoId).
+const hiddenStreams = new Set();
+const hiddenIds = new Set();
 
 // Acepta watch?v=, youtu.be/, /live/, /embed/, /shorts/ o un ID suelto.
 function parseVideoId(url) {
@@ -91,6 +105,11 @@ function isHls(url) {
   } catch {
     return false;
   }
+}
+
+// Identifica un stream de la config entre categorías (el mismo canal puede estar en varias).
+function streamKey(stream) {
+  return stream.url || stream.channel || stream.polymarket || null;
 }
 
 function setStatus(tile, text) {
@@ -119,6 +138,7 @@ function setOffline(tile, offline) {
 function showChannelOsd(tile) {
   channelOsd.number.textContent = tile.number;
   channelOsd.name.textContent = tile.name;
+  channelOsd.category.textContent = categories.length > 1 ? categories[categoryIndex].name : '';
   channelOsd.el.classList.toggle('muted', muted);
   channelOsd.el.hidden = false;
   clearTimeout(channelOsd.timer);
@@ -325,7 +345,7 @@ function syncLives(group) {
       }
       group.tiles.filter((t) => t.failed && !t.hidden).forEach(createPlayer);
       const max = group.stream.max || Infinity;
-      lives.filter((l) => !shown(l.id) && !group.hiddenIds.has(l.id))
+      lives.filter((l) => !shown(l.id) && !hiddenIds.has(l.id))
         .slice(0, max - group.tiles.length).forEach((l) => addTile(group, l));
     })
     .catch((err) => {
@@ -617,11 +637,13 @@ function removeTile(tile) {
 // los demás lives del canal siguen apareciendo como tiles extra.
 function hideTile(tile) {
   const { group } = tile;
-  if (tile.videoId) group.hiddenIds.add(tile.videoId);
+  if (tile.videoId) hiddenIds.add(tile.videoId);
   if (tile !== group.tiles[0]) {
     removeTile(tile);
     return;
   }
+  const key = streamKey(tile.stream);
+  if (key) hiddenStreams.add(key);
   clearTimeout(tile.retryTimer);
   if (tile.player) tile.player.destroy();
   closeMarket(tile);
@@ -649,11 +671,15 @@ function closeConfirm() {
 }
 
 function buildGrid(streams) {
+  // Si en otra categoría se ocultaron todos los streams de esta, se muestran
+  // igual: el mosaico no puede quedar vacío.
+  const hide = (stream) => hiddenStreams.has(streamKey(stream)) &&
+    !streams.every((s) => hiddenStreams.has(streamKey(s)));
   streams.forEach((stream, index) => {
     const name = stream.name || stream.url || stream.channel || stream.polymarket || 'Sin canal';
-    // hiddenIds: lives ocultados con Shift+H, para que syncLives no los vuelva a abrir.
-    const group = { stream, index, name, tiles: [], hiddenIds: new Set(), timer: null, sync: null };
+    const group = { stream, index, name, tiles: [], timer: null, sync: null };
     const tile = makeTile(group);
+    tile.hidden = hide(stream);
     group.tiles.push(tile);
     groups.push(group);
     tiles.push(tile);
@@ -663,12 +689,94 @@ function buildGrid(streams) {
   layout();
   groups.forEach((group) => {
     if (!group.stream.channel) {
-      createPlayer(group.tiles[0]);
+      if (!group.tiles[0].hidden) createPlayer(group.tiles[0]);
       return;
     }
     setStatus(group.tiles[0], 'Cargando…');
     syncLives(group);
   });
+}
+
+// Cierra los tiles de la categoría actual (players, mercados y timers) y abre
+// los de la categoría i. Las demás categorías no quedan reproduciendo.
+function showCategory(i) {
+  zoomEnd?.();
+  zoomed = false;
+  grid.classList.remove('zoomed');
+  closeConfirm();
+  groups.forEach((group) => {
+    clearTimeout(group.timer);
+    group.sync = null;
+  });
+  tiles.forEach((tile) => {
+    clearTimeout(tile.retryTimer);
+    if (tile.player) tile.player.destroy();
+    closeMarket(tile);
+  });
+  groups.length = 0;
+  tiles.length = 0;
+  visible = [];
+  focusIndex = 0;
+  audioTile = null;
+  grid.replaceChildren();
+
+  categoryIndex = i;
+  configColumns = categories[i].columns;
+  buildGrid(categories[i].streams);
+  // Un canal puede quedar fuera del mosaico ya al crearse (URL inválida, sin canal).
+  setFocus(visible[0]);
+}
+
+function stepCategory(delta) {
+  const n = categories.length;
+  if (n > 1) showCategory((categoryIndex + delta + n) % n);
+}
+
+// Menú OSD de categorías (c): ↑↓ para elegir, Enter o el número para abrirla.
+function openMenu() {
+  menuIndex = categoryIndex;
+  renderMenu();
+  menu.el.hidden = false;
+}
+
+function closeMenu() {
+  menuIndex = null;
+  menu.el.hidden = true;
+}
+
+function renderMenu() {
+  menu.list.replaceChildren(...categories.map((category, k) => {
+    const li = document.createElement('li');
+    li.textContent = `${k < 9 ? k + 1 : ' '} ${category.name}`;
+    li.classList.toggle('selected', k === menuIndex);
+    li.classList.toggle('current', k === categoryIndex);
+    return li;
+  }));
+}
+
+function pickCategory(i) {
+  closeMenu();
+  if (i !== categoryIndex) showCategory(i);
+}
+
+// Con el menú abierto las demás teclas no hacen nada, como en un televisor.
+function onMenuKey(e) {
+  const n = categories.length;
+  switch (e.key) {
+    case 'ArrowUp': case 'k':
+      menuIndex = (menuIndex - 1 + n) % n;
+      renderMenu();
+      break;
+    case 'ArrowDown': case 'j':
+      menuIndex = (menuIndex + 1) % n;
+      renderMenu();
+      break;
+    case 'Enter': case ' ': pickCategory(menuIndex); break;
+    case 'c': case 'Escape': closeMenu(); break;
+    default:
+      if (/^[1-9]$/.test(e.key) && Number(e.key) <= n) pickCategory(Number(e.key) - 1);
+  }
+  e.preventDefault();
 }
 
 // Arma la grilla con los tiles visibles. Los ocultos no se destruyen: siguen
@@ -805,6 +913,10 @@ function onKey(e) {
     e.preventDefault();
     return;
   }
+  if (menuIndex !== null) {
+    onMenuKey(e);
+    return;
+  }
   const tile = tiles[focusIndex];
   switch (e.key) {
     case 'ArrowLeft': case 'h': moveFocus(-1, 0); break;
@@ -830,6 +942,9 @@ function onKey(e) {
       if (tile.stream.channel) syncLives(tile.group);
       break;
     case 'H': askHide(tile); break;
+    case 'c': openMenu(); break;
+    case '[': case 'PageUp': stepCategory(-1); break;
+    case ']': case 'PageDown': stepCategory(1); break;
     case 's':
       showOffline = !showOffline;
       layout();
@@ -889,16 +1004,20 @@ async function main() {
     showMessage(config.error);
     return;
   }
-  const streams = config.streams || [];
-  if (!streams.length) {
+  // Sin "categories", la lista "streams" es una sola categoría.
+  categories = (config.categories || [{ streams: config.streams }])
+    .map((c, k) => ({
+      name: c.name || `Categoría ${k + 1}`,
+      streams: c.streams || [],
+      columns: c.columns ?? config.columns ?? null,
+    }))
+    .filter((c) => c.streams.length);
+  if (!categories.length) {
     showMessage(`No hay streams en ${config.file}`);
     return;
   }
   await ytReady;
-  configColumns = config.columns;
-  buildGrid(streams);
-  // Un canal puede quedar fuera del mosaico ya al crearse (URL inválida, sin canal).
-  setFocus(visible[0]);
+  showCategory(0);
 }
 
 main();

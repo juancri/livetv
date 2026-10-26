@@ -15,13 +15,19 @@ La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `
 ```json
 {
   "columns": null,
-  "streams": [
-    { "name": "Lofi Girl", "url": "https://www.youtube.com/watch?v=0sfDth4lMLc" },
-    { "name": "DW News", "channel": "UCknLrEdhRCp1aegoMqRaCZg" },
-    { "name": "Reservado" }
+  "categories": [
+    { "name": "Noticias", "streams": [
+      { "name": "DW News", "channel": "UCknLrEdhRCp1aegoMqRaCZg" },
+      { "name": "Reservado" }
+    ]},
+    { "name": "Música", "columns": 1, "streams": [
+      { "name": "Lofi Girl", "url": "https://www.youtube.com/watch?v=0sfDth4lMLc" }
+    ]}
   ]
 }
 ```
+
+El mosaico muestra una categoría a la vez (al empezar, la primera); al cambiar se cierran los streams de la anterior. Un mismo canal puede repetirse en varias categorías. En vez de `categories` se puede usar directamente una lista `"streams": [...]`, que queda como una sola categoría.
 
 - `url`: `watch?v=`, `youtu.be/`, `/live/`, `/embed/` o el ID de 11 caracteres. También acepta un stream HLS directo (URL `.m3u8`), que se reproduce con hls.js; si termina o falla se reintenta cada 30 s.
 - `channel`: ID del canal (`UC…`), handle (`@nombre`) o URL del canal; sigue automáticamente el live actual. Si el canal transmite varios lives a la vez, cada uno ocupa su propio tile (`CH 07`, `CH 07-2`, …), que se cierra cuando ese live termina. Los lives nuevos se detectan cada 2 minutos.
@@ -29,7 +35,7 @@ La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `
 - `polymarket`: slug o URL (`polymarket.com/event/<slug>`) de un evento de Polymarket. El tile no tiene video: muestra la probabilidad de cada outcome, su variación del día y un sparkline de 24 h, actualizados en vivo. Ejemplo: `{ "name": "Brasil 2ª vuelta", "polymarket": "brazil-presidential-election" }`.
 - `outcomes`: opcional, con `polymarket`; cuántos outcomes mostrar (por defecto 4, los más probables).
 - Sin `url`, `channel` ni `polymarket`: tile vacío "SIN CANAL".
-- `columns`: opcional; por defecto `ceil(sqrt(N))`.
+- `columns`: opcional, global o por categoría; por defecto `ceil(sqrt(N))`.
 
 Los canales sin señal (error, live terminado, embed deshabilitado) y las celdas vacías se muestran con pantalla azul estilo VHS. Los `channel` y los lives terminados se reintentan cada 30 s.
 
@@ -43,7 +49,9 @@ Los canales sin señal (error, live terminado, embed deshabilitado) y las celdas
 | m | silenciar/reactivar el audio (global) |
 | + / − | volumen global, se mantiene al cambiar de canal (OSD en pantalla; quita el silencio) |
 | r | recargar el stream enfocado |
-| Shift+H | ocultar el stream enfocado y cerrar su reproductor (pide confirmación: H/Enter sí, otra tecla no); vuelve al reiniciar la app |
+| Shift+H | ocultar el stream enfocado y cerrar su reproductor (pide confirmación: H/Enter sí, otra tecla no); queda oculto en todas las categorías hasta reiniciar la app |
+| c | menú de categorías: ↑↓ / j k elegir, Enter o 1–9 abrir, c / Esc cerrar |
+| [ / ] · RePág / AvPág | categoría anterior / siguiente |
 | f / F11 | pantalla completa |
 | ? | ayuda |
 | Esc | cerrar ampliación/ayuda, o salir |

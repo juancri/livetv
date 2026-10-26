@@ -250,6 +250,51 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Categoría actual, sobre el número de canal (solo con más de una categoría). */
+.osd-category {
+  margin-bottom: 1vh;
+  font-size: clamp(20px, 4vh, 52px);
+  letter-spacing: 0.04em;
+}
+.osd-category:empty { display: none; }
+/* Menú de categorías (c): lista centrada, la elegida en video inverso. */
+#osd-menu {
+  inset: 0;
+  display: grid;
+  place-content: center;
+  line-height: 1.1;
+  background: rgba(0, 0, 0, 0.7);
+}
+#osd-menu[hidden] { display: none; }
+.osd-menu-title {
+  font-size: clamp(40px, 9vh, 120px);
+  letter-spacing: 0.08em;
+  margin-bottom: 2vh;
+}
+.osd-menu-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: clamp(28px, 6vh, 80px);
+  letter-spacing: 0.04em;
+}
+.osd-menu-list li {
+  padding: 0 0.4em;
+  white-space: pre;
+}
+.osd-menu-list li.current::after { content: ' ●'; }
+.osd-menu-list li.selected {
+  color: #000;
+  background: #3cff3c;
+  text-shadow: none;
+  box-shadow: 0 0 14px rgba(60, 255, 60, 0.6);
+}
+.osd-menu-keys {
+  margin-top: 2vh;
+  font-size: clamp(20px, 4vh, 52px);
+  letter-spacing: 0.04em;
+}
+
 /* Confirmación de ocultar: centrada sobre todo el mosaico. */
 #osd-confirm {
   inset: 0;
