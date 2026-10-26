@@ -27,6 +27,8 @@ La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `
 }
 ```
 
+Desde el menú de categorías (`c`) se puede **agregar un canal** sin editar el archivo: se escribe un handle (`@canal`), una URL de canal o video de YouTube, una URL `.m3u8` o la de un evento de Polymarket, un nombre opcional (si queda vacío se usa el título de YouTube o Polymarket) y la categoría (←→). Se guarda al final de esa categoría en el archivo de config (que se reescribe con formato JSON estándar) y se abre en el acto.
+
 El mosaico muestra una categoría a la vez (al empezar, la primera); al cambiar se cierran los streams de la anterior. Un mismo canal puede repetirse en varias categorías. En vez de `categories` se puede usar directamente una lista `"streams": [...]`, que queda como una sola categoría.
 
 - `url`: `watch?v=`, `youtu.be/`, `/live/`, `/embed/` o el ID de 11 caracteres. También acepta un stream HLS directo (URL `.m3u8`), que se reproduce con hls.js; si termina o falla se reintenta cada 30 s.
@@ -50,7 +52,7 @@ Los canales sin señal (error, live terminado, embed deshabilitado) y las celdas
 | + / − | volumen global, se mantiene al cambiar de canal (OSD en pantalla; quita el silencio) |
 | r | recargar el stream enfocado |
 | Shift+H | ocultar el stream enfocado y cerrar su reproductor (pide confirmación: H/Enter sí, otra tecla no); queda oculto en todas las categorías hasta reiniciar la app |
-| c | menú de categorías: ↑↓ / j k elegir, Enter o 1–9 abrir, c / Esc cerrar |
+| c | menú de categorías: ↑↓ / j k elegir, Enter o 1–9 abrir, c / Esc cerrar; al final, **+ Agregar canal** (o `a`) |
 | [ / ] · RePág / AvPág | categoría anterior / siguiente |
 | f / F11 | pantalla completa |
 | ? | ayuda |

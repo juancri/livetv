@@ -133,6 +133,56 @@ async function priceHistory(tokenId) {
   return data.history || [];
 }
 
+const decodeEntities = (s) => s
+  .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+  .replace(/&#x([\da-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+  .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+// Nombre para un stream agregado sin nombre: el título del canal, del video o
+// del evento de Polymarket. Si no se puede averiguar queda sin nombre.
+async function guessName(stream) {
+  try {
+    if (stream.polymarket) return (await findMarket(stream.polymarket)).title;
+    if (stream.url && !/\.m3u8$/i.test(new URL(stream.url).pathname)) {
+      const page = await fetchPage(stream.url);
+      const m = page.match(/<meta property="og:title" content="([^"]*)"/);
+      return m ? decodeEntities(m[1]) : null;
+    }
+    if (stream.channel) {
+      const page = await fetchPage(channelUrl(stream.channel));
+      const m = page.match(/<meta property="og:title" content="([^"]*)"/);
+      return m ? decodeEntities(m[1]) : null;
+    }
+  } catch {}
+  return null;
+}
+
+// Agrega un stream a la categoría `category` (índice en la config) y reescribe
+// el archivo. Se relee antes de escribir por si se editó con la app abierta;
+// si la categoría ya no es la misma, no se toca. Devuelve el stream guardado.
+async function addStream({ category, categoryName, stream }) {
+  const { file } = loadConfig();
+  if (!file) throw new Error('No hay archivo de configuración');
+  const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+  let list;
+  if (Array.isArray(config.categories)) {
+    const target = config.categories[category];
+    if (!target || (target.name || '') !== categoryName) {
+      throw new Error(`${path.basename(file)} cambió: reinicia la app`);
+    }
+    list = target.streams = target.streams || [];
+  } else {
+    list = config.streams = config.streams || [];
+  }
+  const saved = stream.name ? stream : { name: await guessName(stream) || undefined, ...stream };
+  list.push(saved);
+  // Escritura atómica: un archivo a medio escribir dejaría la app sin config.
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(config, null, 2)}\n`);
+  fs.renameSync(tmp, file);
+  return saved;
+}
+
 // Los embeds de YouTube fallan desde file:// (sin Referer/origin válido),
 // así que el renderer se sirve desde un HTTP local.
 function startServer() {
@@ -205,6 +255,7 @@ ipcMain.handle('get-config', () => loadConfig());
 ipcMain.handle('find-lives', (_e, channel) => findLives(channel));
 ipcMain.handle('find-market', (_e, value) => findMarket(value));
 ipcMain.handle('price-history', (_e, tokenId) => priceHistory(tokenId));
+ipcMain.handle('add-stream', (_e, args) => addStream(args));
 ipcMain.on('toggle-fullscreen', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   win.setFullScreen(!win.isFullScreen());

@@ -43,6 +43,17 @@ const menu = {
   el: document.getElementById('osd-menu'),
   list: document.querySelector('#osd-menu .osd-menu-list'),
 };
+const addForm = {
+  el: document.getElementById('osd-add'),
+  source: document.querySelector('#osd-add [name=source]'),
+  name: document.querySelector('#osd-add [name=name]'),
+  category: document.querySelector('#osd-add .osd-field-category'),
+  categoryName: document.querySelector('#osd-add .osd-add-category'),
+  error: document.querySelector('#osd-add .osd-add-error'),
+  // Categoría elegida (índice en categories).
+  index: 0,
+  saving: false,
+};
 const confirmOsd = {
   el: document.getElementById('osd-confirm'),
   title: document.querySelector('#osd-confirm .osd-confirm-title'),
@@ -77,7 +88,8 @@ let audioTile = null;
 // Categorías de la config; el mosaico muestra una a la vez.
 let categories = [];
 let categoryIndex = 0;
-// Categoría resaltada en el menú (c), o null con el menú cerrado.
+// Categoría resaltada en el menú (c), o null con el menú cerrado. Después de
+// las categorías va "Agregar canal" (índice categories.length).
 let menuIndex = null;
 // Ocultos con Shift+H en cualquier categoría, hasta reiniciar: streams de la
 // config (por streamKey) y lives de canales (por videoId).
@@ -110,6 +122,26 @@ function isHls(url) {
 // Identifica un stream de la config entre categorías (el mismo canal puede estar en varias).
 function streamKey(stream) {
   return stream.url || stream.channel || stream.polymarket || null;
+}
+
+// Lo escrito en "Agregar canal": handle o ID de canal, URL de canal o video de
+// YouTube, URL .m3u8 o URL de un evento de Polymarket. null si no se reconoce.
+function parseStreamInput(text) {
+  const value = text.trim();
+  if (/^@?[\w.-]+$/.test(value)) return { channel: value };
+  let u;
+  try {
+    u = new URL(value);
+  } catch {
+    return null;
+  }
+  if (/(^|\.)polymarket\.com$/.test(u.hostname) && u.pathname.startsWith('/event/')) return { polymarket: value };
+  if (isHls(value)) return { url: value };
+  if (/(^|\.)(youtube\.com|youtu\.be)$/.test(u.hostname)) {
+    if (parseVideoId(value)) return { url: value };
+    if (/^\/(@[^/]+|channel\/UC[\w-]{22}|c\/[^/]+|user\/[^/]+)/.test(u.pathname)) return { channel: value };
+  }
+  return null;
 }
 
 function setStatus(tile, text) {
@@ -675,26 +707,33 @@ function buildGrid(streams) {
   // igual: el mosaico no puede quedar vacío.
   const hide = (stream) => hiddenStreams.has(streamKey(stream)) &&
     !streams.every((s) => hiddenStreams.has(streamKey(s)));
-  streams.forEach((stream, index) => {
-    const name = stream.name || stream.url || stream.channel || stream.polymarket || 'Sin canal';
-    const group = { stream, index, name, tiles: [], timer: null, sync: null };
-    const tile = makeTile(group);
-    tile.hidden = hide(stream);
-    group.tiles.push(tile);
-    groups.push(group);
-    tiles.push(tile);
-    grid.append(tile.el);
-    renumber(group);
-  });
+  streams.forEach((stream) => addGroup(stream, hide(stream)));
   layout();
-  groups.forEach((group) => {
-    if (!group.stream.channel) {
-      if (!group.tiles[0].hidden) createPlayer(group.tiles[0]);
-      return;
-    }
-    setStatus(group.tiles[0], 'Cargando…');
-    syncLives(group);
-  });
+  groups.forEach(startGroup);
+}
+
+// Agrega al final del mosaico el tile fijo de un stream de la config. No
+// arranca el player: falta layout() y startGroup().
+function addGroup(stream, hidden) {
+  const name = stream.name || stream.url || stream.channel || stream.polymarket || 'Sin canal';
+  const group = { stream, index: groups.length, name, tiles: [], timer: null, sync: null };
+  const tile = makeTile(group);
+  tile.hidden = hidden;
+  group.tiles.push(tile);
+  groups.push(group);
+  tiles.push(tile);
+  grid.append(tile.el);
+  renumber(group);
+  return group;
+}
+
+function startGroup(group) {
+  if (!group.stream.channel) {
+    if (!group.tiles[0].hidden) createPlayer(group.tiles[0]);
+    return;
+  }
+  setStatus(group.tiles[0], 'Cargando…');
+  syncLives(group);
 }
 
 // Cierra los tiles de la categoría actual (players, mercados y timers) y abre
@@ -745,13 +784,16 @@ function closeMenu() {
 }
 
 function renderMenu() {
+  const add = document.createElement('li');
+  add.className = 'action';
+  add.textContent = '+ AGREGAR CANAL';
   menu.list.replaceChildren(...categories.map((category, k) => {
     const li = document.createElement('li');
     li.textContent = `${k < 9 ? k + 1 : ' '} ${category.name}`;
-    li.classList.toggle('selected', k === menuIndex);
     li.classList.toggle('current', k === categoryIndex);
     return li;
-  }));
+  }), add);
+  menu.list.children[menuIndex].classList.add('selected');
 }
 
 function pickCategory(i) {
@@ -761,7 +803,7 @@ function pickCategory(i) {
 
 // Con el menú abierto las demás teclas no hacen nada, como en un televisor.
 function onMenuKey(e) {
-  const n = categories.length;
+  const n = categories.length + 1;
   switch (e.key) {
     case 'ArrowUp': case 'k':
       menuIndex = (menuIndex - 1 + n) % n;
@@ -771,12 +813,106 @@ function onMenuKey(e) {
       menuIndex = (menuIndex + 1) % n;
       renderMenu();
       break;
-    case 'Enter': case ' ': pickCategory(menuIndex); break;
+    case 'Enter': case ' ':
+      if (menuIndex === categories.length) openAddForm();
+      else pickCategory(menuIndex);
+      break;
+    case 'a': openAddForm(); break;
     case 'c': case 'Escape': closeMenu(); break;
     default:
-      if (/^[1-9]$/.test(e.key) && Number(e.key) <= n) pickCategory(Number(e.key) - 1);
+      if (/^[1-9]$/.test(e.key) && Number(e.key) <= categories.length) pickCategory(Number(e.key) - 1);
   }
   e.preventDefault();
+}
+
+// Formulario "Agregar canal" (desde el menú de categorías). El stream se
+// guarda en el archivo de config y se abre al final de su categoría.
+function openAddForm() {
+  closeMenu();
+  addForm.index = categoryIndex;
+  addForm.source.value = '';
+  addForm.name.value = '';
+  addForm.error.textContent = '';
+  renderAddCategory();
+  addForm.el.hidden = false;
+  addForm.source.focus();
+}
+
+function closeAddForm() {
+  addForm.el.hidden = true;
+  document.activeElement?.blur();
+}
+
+function renderAddCategory() {
+  addForm.categoryName.textContent = `◀ ${categories[addForm.index].name} ▶`;
+}
+
+// Las teclas que no son del formulario quedan para los campos de texto.
+function onAddKey(e) {
+  const fields = [addForm.source, addForm.name, addForm.category];
+  const pos = fields.indexOf(document.activeElement);
+  switch (e.key) {
+    case 'Escape': closeAddForm(); break;
+    case 'Enter': saveAddForm(); break;
+    case 'ArrowUp': case 'ArrowDown': case 'Tab': {
+      const d = e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey) ? -1 : 1;
+      fields[(Math.max(pos, 0) + d + fields.length) % fields.length].focus();
+      break;
+    }
+    case 'ArrowLeft': case 'ArrowRight': {
+      if (pos !== 2) return;
+      const n = categories.length;
+      addForm.index = (addForm.index + (e.key === 'ArrowLeft' ? -1 : 1) + n) % n;
+      renderAddCategory();
+      break;
+    }
+    default: return;
+  }
+  e.preventDefault();
+}
+
+async function saveAddForm() {
+  if (addForm.saving) return;
+  const parsed = parseStreamInput(addForm.source.value);
+  if (!parsed) {
+    addForm.error.textContent = 'NO SE RECONOCE EL CANAL';
+    return;
+  }
+  const category = categories[addForm.index];
+  const key = streamKey(parsed);
+  if (category.streams.some((s) => streamKey(s) === key)) {
+    addForm.error.textContent = `YA ESTÁ EN ${category.name.toUpperCase()}`;
+    return;
+  }
+  const name = addForm.name.value.trim();
+  addForm.saving = true;
+  addForm.error.textContent = 'GUARDANDO…';
+  let stream;
+  try {
+    stream = await window.livetv.addStream({
+      category: category.index,
+      categoryName: category.configName,
+      stream: name ? { name, ...parsed } : parsed,
+    });
+  } catch (err) {
+    addForm.error.textContent = err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '').toUpperCase();
+    return;
+  } finally {
+    addForm.saving = false;
+  }
+  addForm.error.textContent = '';
+  closeAddForm();
+  category.streams.push(stream);
+  // Volver a agregar un stream oculto con Shift+H lo muestra de nuevo.
+  hiddenStreams.delete(key);
+  if (addForm.index === categoryIndex) {
+    const group = addGroup(stream, false);
+    layout();
+    startGroup(group);
+  } else {
+    showCategory(addForm.index);
+  }
+  setFocus(tiles.indexOf(groups.find((g) => g.stream === stream).tiles[0]));
 }
 
 // Arma la grilla con los tiles visibles. Los ocultos no se destruyen: siguen
@@ -905,6 +1041,10 @@ function onKey(e) {
     if (e.key === 'q' || e.key === 'Escape') window.livetv.quit();
     return;
   }
+  if (!addForm.el.hidden) {
+    onAddKey(e);
+    return;
+  }
   // Confirmación de Shift+H: H o Enter oculta; cualquier otra tecla cancela.
   if (pendingHide) {
     const tile = pendingHide;
@@ -1007,6 +1147,9 @@ async function main() {
   // Sin "categories", la lista "streams" es una sola categoría.
   categories = (config.categories || [{ streams: config.streams }])
     .map((c, k) => ({
+      // index y configName ubican la categoría en el archivo al agregar un canal.
+      index: k,
+      configName: c.name || '',
       name: c.name || `Categoría ${k + 1}`,
       streams: c.streams || [],
       columns: c.columns ?? config.columns ?? null,

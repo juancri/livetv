@@ -295,6 +295,53 @@ html, body {
   letter-spacing: 0.04em;
 }
 
+.osd-menu-list li.action { margin-top: 1vh; }
+/* Formulario "Agregar canal": campos en verde fósforo, el activo en video inverso. */
+#osd-add {
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 1.5vh;
+  background: rgba(0, 0, 0, 0.8);
+  /* Los .osd no reciben clics; este tapa el mosaico mientras está abierto. */
+  pointer-events: auto;
+}
+#osd-add[hidden] { display: none; }
+.osd-field {
+  display: grid;
+  grid-template-columns: 9em minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.6em;
+  width: min(80vw, 34em);
+  font-size: clamp(22px, 4.5vh, 56px);
+  letter-spacing: 0.04em;
+  outline: none;
+}
+.osd-field input {
+  font: inherit;
+  color: inherit;
+  text-shadow: inherit;
+  background: rgba(60, 255, 60, 0.08);
+  border: 2px solid rgba(60, 255, 60, 0.4);
+  padding: 0 0.3em;
+  outline: none;
+  caret-color: #3cff3c;
+}
+.osd-field input::placeholder { color: rgba(60, 255, 60, 0.35); text-shadow: none; }
+.osd-field input:focus { border-color: #3cff3c; box-shadow: 0 0 12px rgba(60, 255, 60, 0.5); }
+.osd-field-category:focus .osd-add-category {
+  color: #000;
+  background: #3cff3c;
+  text-shadow: none;
+}
+.osd-add-category { padding: 0 0.3em; }
+.osd-add-error {
+  min-height: 1.1em;
+  font-size: clamp(20px, 4vh, 52px);
+  color: #ff4a3c;
+  text-shadow: 3px 3px 0 #000, 0 0 10px rgba(255, 74, 60, 0.5);
+}
+
 /* Confirmación de ocultar: centrada sobre todo el mosaico. */
 #osd-confirm {
   inset: 0;
