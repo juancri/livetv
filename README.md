@@ -27,7 +27,7 @@ La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `
 }
 ```
 
-Desde el menú de categorías (`c`) se puede **agregar un canal** sin editar el archivo: se escribe un handle (`@canal`), una URL de canal o video de YouTube, una URL `.m3u8` o la de un evento de Polymarket, un nombre opcional (si queda vacío se usa el título de YouTube o Polymarket) y la categoría (←→). Se guarda al final de esa categoría en el archivo de config (que se reescribe con formato JSON estándar) y se abre en el acto.
+Desde el menú de categorías (`c`) se puede **agregar un canal** sin editar el archivo: se escribe un handle (`@canal`), una URL de canal o video de YouTube, una URL `.m3u8`, la de un evento de Polymarket o la de un mapa de windy.com, un nombre opcional (si queda vacío se usa el título de YouTube o Polymarket) y la categoría (←→). Se guarda al final de esa categoría en el archivo de config (que se reescribe con formato JSON estándar) y se abre en el acto.
 
 El mosaico muestra una categoría a la vez (al empezar, la primera); al cambiar se cierran los streams de la anterior. Un mismo canal puede repetirse en varias categorías. En vez de `categories` se puede usar directamente una lista `"streams": [...]`, que queda como una sola categoría.
 
@@ -36,7 +36,8 @@ El mosaico muestra una categoría a la vez (al empezar, la primera); al cambiar 
 - `max`: opcional, con `channel`; tope de tiles (lives simultáneos) para ese canal.
 - `polymarket`: slug o URL (`polymarket.com/event/<slug>`) de un evento de Polymarket. El tile no tiene video: muestra la probabilidad de cada outcome, su variación del día y un sparkline de 24 h, actualizados en vivo. Ejemplo: `{ "name": "Brasil 2ª vuelta", "polymarket": "brazil-presidential-election" }`.
 - `outcomes`: opcional, con `polymarket`; cuántos outcomes mostrar (por defecto 4, los más probables).
-- Sin `url`, `channel` ni `polymarket`: tile vacío "SIN CANAL".
+- `windy`: URL de un mapa de windy.com (`https://www.windy.com/?wind,-33.45,-70.66,7`: capa, latitud, longitud y zoom, tal como queda en la barra de direcciones; con `/lat/lon` en el path se marca ese punto y se muestra su pronóstico) o una URL de `embed.windy.com` (el widget de "Embed" de Windy, con todas sus opciones). El tile no tiene audio y se recarga cada hora.
+- Sin `url`, `channel`, `polymarket` ni `windy`: tile vacío "SIN CANAL".
 - `columns`: opcional, global o por categoría; por defecto `ceil(sqrt(N))`.
 
 Los canales sin señal (error, live terminado, embed deshabilitado) y las celdas vacías se muestran con pantalla azul estilo VHS. Los `channel` y los lives terminados se reintentan cada 30 s.

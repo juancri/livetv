@@ -139,10 +139,11 @@ const decodeEntities = (s) => s
   .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 
 // Nombre para un stream agregado sin nombre: el título del canal, del video o
-// del evento de Polymarket. Si no se puede averiguar queda sin nombre.
+// del evento de Polymarket, o "Windy". Si no se puede averiguar queda sin nombre.
 async function guessName(stream) {
   try {
     if (stream.polymarket) return (await findMarket(stream.polymarket)).title;
+    if (stream.windy) return 'Windy';
     if (stream.url && !/\.m3u8$/i.test(new URL(stream.url).pathname)) {
       const page = await fetchPage(stream.url);
       const m = page.match(/<meta property="og:title" content="([^"]*)"/);

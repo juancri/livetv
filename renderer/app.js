@@ -20,6 +20,10 @@ const MARKET_RECONNECT_MS = 5000;
 const MARKET_ROWS = 4;
 // Como polymarket.com: con un spread mayor se muestra el último trade, no el punto medio.
 const MARKET_MAX_SPREAD = 0.1;
+// El embed de Windy muestra el pronóstico del momento en que cargó: se recarga cada hora.
+const WINDY_RELOAD_MS = 3600000;
+// Modelos de Windy que pueden aparecer en la URL de windy.com junto a la capa.
+const WINDY_PRODUCTS = ['ecmwf', 'gfs', 'icon', 'iconEu', 'iconD2', 'nam', 'namConus', 'arome', 'ukv', 'hrrr', 'ecmwfWaves', 'gfsWaves', 'iconWaves', 'cams'];
 const DAY_S = 86400;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -119,13 +123,58 @@ function isHls(url) {
   }
 }
 
+// Visualización de windy.com. windy.com no se deja embeber (frame-ancestors),
+// así que su URL (?capa,lat,lon,zoom; /lat/lon marca un punto con detalle) se
+// traduce al widget de embed.windy.com. Una URL de embed.windy.com va tal cual.
+function windyEmbedUrl(value) {
+  let u;
+  try {
+    u = new URL(value);
+  } catch {
+    return null;
+  }
+  if (u.hostname === 'embed.windy.com') return value;
+  if (!/(^|\.)windy\.com$/.test(u.hostname)) return null;
+  const tokens = decodeURIComponent(u.search.slice(1)).split(',');
+  const numbers = tokens.filter((t) => /^-?\d+(\.\d+)?$/.test(t)).map(Number);
+  const words = tokens.filter((t) => /^[a-zA-Z]\w*$/.test(t));
+  const point = u.pathname.match(/^\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/);
+  const [lat, lon, zoom] = numbers.length >= 2 ? numbers : point ? [Number(point[1]), Number(point[2]), 8] : [];
+  if (lat === undefined) return null;
+  const params = new URLSearchParams({
+    type: 'map',
+    location: 'coordinates',
+    metricRain: 'default',
+    metricTemp: 'default',
+    metricWind: 'default',
+    zoom: String(zoom ?? 5),
+    overlay: words.find((w) => !WINDY_PRODUCTS.includes(w)) || 'wind',
+    product: words.find((w) => WINDY_PRODUCTS.includes(w)) || 'ecmwf',
+    level: 'surface',
+    lat: String(lat),
+    lon: String(lon),
+  });
+  if (point) {
+    params.set('detailLat', point[1]);
+    params.set('detailLon', point[2]);
+    params.set('detail', 'true');
+    params.set('marker', 'true');
+  }
+  return `https://embed.windy.com/embed.html?${params}`;
+}
+
+// Polymarket y Windy no tienen audio: con el foco en ellos sigue sonando el último video.
+function isSilent(stream) {
+  return !!(stream.polymarket || stream.windy);
+}
+
 // Identifica un stream de la config entre categorías (el mismo canal puede estar en varias).
 function streamKey(stream) {
-  return stream.url || stream.channel || stream.polymarket || null;
+  return stream.url || stream.channel || stream.polymarket || stream.windy || null;
 }
 
 // Lo escrito en "Agregar canal": handle o ID de canal, URL de canal o video de
-// YouTube, URL .m3u8 o URL de un evento de Polymarket. null si no se reconoce.
+// YouTube, URL .m3u8, URL de un evento de Polymarket o de windy.com. null si no se reconoce.
 function parseStreamInput(text) {
   const value = text.trim();
   if (/^@?[\w.-]+$/.test(value)) return { channel: value };
@@ -136,6 +185,7 @@ function parseStreamInput(text) {
     return null;
   }
   if (/(^|\.)polymarket\.com$/.test(u.hostname) && u.pathname.startsWith('/event/')) return { polymarket: value };
+  if (windyEmbedUrl(value)) return { windy: value };
   if (isHls(value)) return { url: value };
   if (/(^|\.)(youtube\.com|youtu\.be)$/.test(u.hostname)) {
     if (parseVideoId(value)) return { url: value };
@@ -177,14 +227,15 @@ function showChannelOsd(tile) {
   channelOsd.timer = setTimeout(() => { channelOsd.el.hidden = true; }, CHANNEL_OSD_MS);
 }
 
-// Tile que suena: el enfocado o, si es de Polymarket, el último video enfocado.
-// Si ese ya no está (oculto con Shift+H o cerrado), el video visible más
-// cercano antes del foco.
+// Tile que suena: el enfocado o, si no tiene audio, el último video enfocado.
+// Si ese ya no está en el mosaico (oculto con Shift+H, cerrado o sin señal),
+// el video visible más cercano antes del foco. Al cerrar un live extra el
+// foco pasa un momento por el tile fijo del canal, que suele estar sin señal.
 function audioSource() {
   const focused = tiles[focusIndex];
-  if (!focused?.stream.polymarket) return focused;
-  if (!tiles.includes(audioTile) || audioTile.hidden) {
-    const videos = visible.map((i) => tiles[i]).filter((t) => !t.stream.polymarket);
+  if (focused && !isSilent(focused.stream)) return focused;
+  if (!visible.includes(tiles.indexOf(audioTile))) {
+    const videos = visible.map((i) => tiles[i]).filter((t) => !isSilent(t.stream));
     audioTile = videos.filter((t) => tiles.indexOf(t) < focusIndex).pop() || videos[0] || null;
   }
   return audioTile;
@@ -206,7 +257,7 @@ function applyAudio() {
 
 function setFocus(i) {
   focusIndex = i;
-  if (!tiles[i].stream.polymarket) audioTile = tiles[i];
+  if (!isSilent(tiles[i].stream)) audioTile = tiles[i];
   tiles.forEach((tile, j) => {
     tile.el.classList.toggle('focused', j === focusIndex);
   });
@@ -227,6 +278,10 @@ function createPlayer(tile) {
   const { stream } = tile;
   if (stream.polymarket) {
     createMarket(tile);
+    return;
+  }
+  if (stream.windy) {
+    createWindy(tile);
     return;
   }
   if (stream.url && isHls(stream.url)) {
@@ -393,6 +448,23 @@ function syncLives(group) {
       const retry = group.tiles.some((t) => !t.hidden && (t.failed || !t.videoId));
       group.timer = setTimeout(() => syncLives(group), retry ? ENDED_RETRY_MS : LIVES_POLL_MS);
     });
+}
+
+// Tile de Windy: el iframe del widget, sin player (tile.ready queda false y
+// applyAudio lo ignora). Se recarga cada WINDY_RELOAD_MS con createPlayer.
+function createWindy(tile) {
+  const src = windyEmbedUrl(tile.stream.windy);
+  if (!src) {
+    setNoSignal(tile, 'SIN SEÑAL');
+    setStatus(tile, `URL inválida: ${tile.stream.windy}`);
+    return;
+  }
+  const frame = document.createElement('iframe');
+  frame.src = src;
+  frame.addEventListener('load', () => setStatus(tile, ''));
+  tile.playerHost.append(frame);
+  setStatus(tile, 'Cargando…');
+  tile.retryTimer = setTimeout(() => createPlayer(tile), WINDY_RELOAD_MS);
 }
 
 // Tile de Polymarket: no tiene reproductor, muestra la probabilidad de cada
@@ -715,7 +787,7 @@ function buildGrid(streams) {
 // Agrega al final del mosaico el tile fijo de un stream de la config. No
 // arranca el player: falta layout() y startGroup().
 function addGroup(stream, hidden) {
-  const name = stream.name || stream.url || stream.channel || stream.polymarket || 'Sin canal';
+  const name = stream.name || streamKey(stream) || 'Sin canal';
   const group = { stream, index: groups.length, name, tiles: [], timer: null, sync: null };
   const tile = makeTile(group);
   tile.hidden = hidden;
