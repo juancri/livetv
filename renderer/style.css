@@ -2,7 +2,7 @@
 :root {
   --ink-1000: #050608; --ink-950: #08090C; --ink-850: #14171E; --ink-700: #262B35;
   --ink-500: #4A5160; --ink-300: #9098A8; --ink-200: #B8BECA; --ink-50: #F2F4F7; --white: #FFFFFF;
-  --lime-400: #CFF752; --lime-500: #C2F02E; --red-500: #FF3D3D;
+  --lime-400: #CFF752; --lime-500: #C2F02E; --red-500: #FF3D3D; --green-500: #3DDC84;
 
   --surface-1: #0E1015;
   --surface-2: var(--ink-850);
@@ -22,6 +22,8 @@
   --focus-ring: var(--white);
   --focus-glow: rgba(255, 255, 255, 0.18);
   --danger: var(--red-500);
+  --success: var(--green-500);
+  --live: var(--red-500);
   --progress-track: rgba(255, 255, 255, 0.18);
 
   --font-display: 'Sora', 'Figtree', system-ui, sans-serif;
@@ -202,27 +204,27 @@ body.idle * { cursor: none !important; }
 }
 .tile.nosignal .status { font-family: system-ui, sans-serif; }
 
-/* Tile de Polymarket: probabilidades en verde fósforo sobre negro con scanlines.
-   Los tamaños van en unidades del contenedor (cqh/cqw) para escalar con el tile,
-   y el de cada row se reparte según la cantidad de rows (--rows). */
+/* Tile de Polymarket: título, una fila por resultado (nombre, probabilidad,
+   variación del día, barra y sparkline) y un pie con el badge EN VIVO.
+   Los tamaños van en unidades del contenedor (cqh/cqw) para escalar con el
+   tile, y el de cada row se reparte según la cantidad de rows (--rows). */
 .market {
   position: absolute;
   inset: 0;
   container-type: size;
   display: flex;
   flex-direction: column;
-  gap: 2cqh;
-  padding: 4% 5%;
-  background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.35) 0 2px, transparent 2px 4px),
-    #031203;
-  font-family: 'VT323', 'DejaVu Sans Mono', monospace;
-  color: #3cff3c;
-  text-shadow: 0 0 8px rgba(60, 255, 60, 0.5);
+  gap: 3cqh;
+  padding: 6cqh 5cqw;
+  background: var(--surface-1);
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
 .market-title {
-  font-size: min(8cqh, 5cqw);
+  font: 600 min(8cqh, 5cqw)/1.15 var(--font-display);
+  letter-spacing: var(--tracking-tight);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -238,42 +240,90 @@ body.idle * { cursor: none !important; }
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: baseline;
-  column-gap: 1em;
-  font-size: min(calc(68cqh / var(--rows) / 3.8), 5cqw);
+  column-gap: 0.8em;
+  font-size: min(calc(64cqh / var(--rows) / 3.8), 4.5cqw);
   line-height: 1;
 }
-.market-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.market-pct { font-size: 1.6em; }
-.market-delta { min-width: 4ch; text-align: right; font-size: 0.8em; }
-.market-delta.up { color: #3cff3c; }
-.market-delta.down { color: #ff4a3c; text-shadow: 0 0 8px rgba(255, 74, 60, 0.5); }
+.market-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.market-pct {
+  font: 700 1.6em/1 var(--font-display);
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
+}
+.market-delta {
+  min-width: 4ch;
+  text-align: right;
+  font-size: 0.8em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+.market-delta.up { color: var(--success); }
+.market-delta.down { color: var(--danger); }
+/* Barra como el ProgressBar del design system: pista translúcida, relleno lima. */
 .market-bar {
   grid-column: 1 / -1;
-  height: 0.25em;
-  margin-top: 0.2em;
-  background: rgba(60, 255, 60, 0.12);
+  height: 0.22em;
+  margin-top: 0.35em;
+  border-radius: var(--radius-pill);
+  background: var(--progress-track);
+  overflow: hidden;
 }
 .market-bar span {
   display: block;
   height: 100%;
-  background: #3cff3c;
-  box-shadow: 0 0 8px rgba(60, 255, 60, 0.6);
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--dur-slow) linear;
 }
 .market-spark {
   grid-column: 1 / -1;
   width: 100%;
   height: 1.4em;
-  margin-top: 0.2em;
+  margin-top: 0.25em;
   overflow: visible;
 }
 .market-spark polyline {
   fill: none;
-  stroke: #3cff3c;
+  stroke: var(--text-tertiary);
   stroke-width: 2;
+  stroke-linejoin: round;
 }
 .market-footer {
-  font-size: min(5cqh, 3.5cqw);
-  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  font-size: min(4.5cqh, 3cqw);
+}
+.market-footer .badge {
+  height: 1.7em;
+  padding: 0 0.6em;
+  gap: 0.4em;
+  font-size: 0.8em;
+}
+.market-time {
+  font: 500 1em/1 var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+/* Badges del design system: EN VIVO (rojo, con punto) y contorno. */
+.badge-live { background: var(--live); color: var(--white); }
+.badge-live::before {
+  content: '';
+  width: 0.45em;
+  height: 0.45em;
+  border-radius: 50%;
+  background: currentColor;
+}
+.badge-outline {
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border-strong);
 }
 
 /* OSD: capas sobre el mosaico con el lenguaje del design system. Se diseñan

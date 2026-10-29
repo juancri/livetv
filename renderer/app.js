@@ -608,7 +608,11 @@ function updateRow(market, row) {
   if (lastPoint && t - lastPoint.t < 60) lastPoint.p = price;
   else row.history.push({ t, p: price });
   renderRow(row);
-  market.footer.textContent = `EN VIVO · ${new Date().toLocaleTimeString('es-CL')}`;
+  if (market.timeEl) market.timeEl.textContent = clockTime();
+}
+
+function clockTime() {
+  return new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
 function renderMarket(tile, market, data) {
@@ -645,10 +649,21 @@ function renderMarket(tile, market, data) {
     list.append(el);
     renderRow(row);
   });
-  market.footer = document.createElement('div');
-  market.footer.className = 'market-footer';
-  market.footer.textContent = data.closed ? 'RESULTADO FINAL' : `EN VIVO · ${new Date().toLocaleTimeString('es-CL')}`;
-  root.append(title, list, market.footer);
+  // Pie: badge EN VIVO con la hora del último precio, o Final si cerró.
+  const footer = document.createElement('div');
+  footer.className = 'market-footer';
+  const badge = document.createElement('span');
+  badge.className = data.closed ? 'badge badge-outline' : 'badge badge-live';
+  badge.textContent = data.closed ? 'Final' : 'En vivo';
+  footer.append(badge);
+  market.timeEl = null;
+  if (!data.closed) {
+    market.timeEl = document.createElement('span');
+    market.timeEl.className = 'market-time';
+    market.timeEl.textContent = clockTime();
+    footer.append(market.timeEl);
+  }
+  root.append(title, list, footer);
   tile.playerHost.replaceChildren(root);
 }
 
@@ -658,7 +673,7 @@ function renderRow(row) {
   row.barEl.style.width = `${price * 100}%`;
   // Variación del día en puntos porcentuales.
   const delta = history.length ? (price - history[0].p) * 100 : 0;
-  row.deltaEl.textContent = Math.abs(delta) < 0.05 ? '' : `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}`;
+  row.deltaEl.textContent = Math.abs(delta) < 0.05 ? '' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`;
   row.deltaEl.classList.toggle('up', delta > 0);
   row.deltaEl.classList.toggle('down', delta < 0);
   // Eje Y fijo de 0 a 100 % para que los rows se puedan comparar.
