@@ -5,6 +5,8 @@ const CHANNEL_OSD_MS = 3000;
 const CONFIRM_MS = 5000;
 const VOLUME_STEP = 5;
 const OSD_MS = 2500;
+// El cursor se oculta tras este tiempo sin mover el mouse, como en un reproductor de video.
+const CURSOR_IDLE_MS = 1000;
 const ZOOM_MS = 900;
 // Se aplica a la animación entera; los keyframes intermedios van en línea recta.
 const ZOOM_EASING = 'cubic-bezier(.65, 0, .35, 1)';
@@ -1220,6 +1222,13 @@ function scaleOsd() {
   document.documentElement.style.setProperty('--ui', String(ui));
 }
 
+// Mover el mouse (o hacer clic) muestra el cursor; quieto, se oculta.
+function wakeCursor() {
+  document.body.classList.remove('idle');
+  clearTimeout(wakeCursor.timer);
+  wakeCursor.timer = setTimeout(() => document.body.classList.add('idle'), CURSOR_IDLE_MS);
+}
+
 function showMessage(text) {
   const el = document.getElementById('message');
   el.textContent = text;
@@ -1230,6 +1239,9 @@ async function main() {
   document.addEventListener('keydown', onKey);
   scaleOsd();
   window.addEventListener('resize', scaleOsd);
+  wakeCursor();
+  document.addEventListener('mousemove', wakeCursor);
+  document.addEventListener('mousedown', wakeCursor);
   // Si un iframe llegara a tomar el foco, devolverlo al documento.
   window.addEventListener('blur', () => setTimeout(() => {
     if (document.activeElement?.tagName === 'IFRAME') document.activeElement.blur();
