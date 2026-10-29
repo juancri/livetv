@@ -184,6 +184,43 @@ async function addStream({ category, categoryName, stream }) {
   return saved;
 }
 
+// Ajustes del menú de setup, aparte de la config de streams (que se edita a
+// mano): ~/.config/livetv/settings.json.
+const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
+const DEFAULT_SETTINGS = { leveler: true };
+let settings = loadSettings();
+
+function loadSettings() {
+  try {
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings(win, changes) {
+  settings = { ...settings, ...changes };
+  const tmp = `${SETTINGS_FILE}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(settings, null, 2)}\n`);
+  fs.renameSync(tmp, SETTINGS_FILE);
+  for (const frame of youtubeFrames(win)) {
+    frame.executeJavaScript(`window.livetvLeveler?.(${settings.leveler})`).catch(() => {});
+  }
+  return settings;
+}
+
+// El nivelador de volumen (renderer/leveler.js) se inyecta en cada iframe de
+// YouTube: es de otro origen y el renderer no puede tocar su audio.
+const LEVELER_JS = fs.readFileSync(path.join(RENDERER_DIR, 'leveler.js'), 'utf8');
+
+function isYoutubeFrame(frame) {
+  return frame.url.startsWith('https://www.youtube.com/');
+}
+
+function youtubeFrames(win) {
+  return win.webContents.mainFrame.framesInSubtree.filter(isYoutubeFrame);
+}
+
 // Los embeds de YouTube fallan desde file:// (sin Referer/origin válido),
 // así que el renderer se sirve desde un HTTP local.
 function startServer() {
@@ -242,11 +279,12 @@ async function createWindow() {
   win.removeMenu();
   // El reproductor de YouTube ignora unMute() si su iframe nunca recibió un
   // gesto de usuario. Ejecutar JS con userGesture=true le da esa activación.
+  // De paso se instala el nivelador de volumen.
   win.webContents.on('did-frame-finish-load', (_e, isMainFrame, processId, routingId) => {
     if (isMainFrame) return;
     const frame = webFrameMain.fromId(processId, routingId);
-    if (frame && frame.url.startsWith('https://www.youtube.com/')) {
-      frame.executeJavaScript('0', true).catch(() => {});
+    if (frame && isYoutubeFrame(frame)) {
+      frame.executeJavaScript(`${LEVELER_JS}\nwindow.livetvLeveler(${settings.leveler});`, true).catch(() => {});
     }
   });
   win.loadURL(`http://127.0.0.1:${port}/`);
@@ -257,6 +295,8 @@ ipcMain.handle('find-lives', (_e, channel) => findLives(channel));
 ipcMain.handle('find-market', (_e, value) => findMarket(value));
 ipcMain.handle('price-history', (_e, tokenId) => priceHistory(tokenId));
 ipcMain.handle('add-stream', (_e, args) => addStream(args));
+ipcMain.handle('get-settings', () => settings);
+ipcMain.handle('set-settings', (e, changes) => saveSettings(BrowserWindow.fromWebContents(e.sender), changes));
 ipcMain.on('toggle-fullscreen', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   win.setFullScreen(!win.isFullScreen());

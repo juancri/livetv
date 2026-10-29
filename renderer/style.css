@@ -505,7 +505,7 @@ kbd {
   transition: transform var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
 .osd-menu-key {
-  min-width: 24px;
+  min-width: 28px;
   font: 600 22px/1 var(--font-mono);
   color: var(--text-tertiary);
 }
@@ -521,8 +521,41 @@ kbd {
   transform: scale(1.02);
 }
 .osd-menu-list li.action { margin-top: 8px; color: var(--text-secondary); }
-.osd-menu-list li.action .osd-menu-key { color: var(--accent); font-size: 28px; }
+.osd-menu-list li.action.next { margin-top: 0; }
+.osd-menu-list li.action .osd-menu-key { display: flex; color: var(--accent); }
+.osd-menu-key .icon { width: 28px; height: 28px; }
 .osd-menu-list li.action.selected { color: var(--text-primary); }
+
+/* Ajustes: filas con título, descripción y un interruptor a la derecha. */
+.osd-setup-list li { min-height: 104px; }
+.osd-setup-text { flex: 1; min-width: 0; }
+.osd-setup-description {
+  margin-top: 6px;
+  font: var(--text-caption);
+  color: var(--text-tertiary);
+}
+.switch {
+  position: relative;
+  flex: none;
+  width: 76px;
+  height: 42px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.2);
+  transition: background var(--dur-base);
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ink-50);
+  transition: left var(--dur-base) var(--ease-out), background var(--dur-base);
+}
+.switch.on { background: var(--accent); }
+.switch.on::after { left: 39px; background: var(--ink-950); }
 
 /* Agregar canal: campos de texto en píldora; el activo con anillo de foco. */
 #osd-add { pointer-events: auto; }

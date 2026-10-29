@@ -49,6 +49,18 @@ const menu = {
   el: document.getElementById('osd-menu'),
   list: document.querySelector('#osd-menu .osd-menu-list'),
 };
+const setupMenu = {
+  el: document.getElementById('osd-setup'),
+  list: document.querySelector('#osd-setup .osd-setup-list'),
+};
+// Filas del menú de ajustes; key es el nombre en settings.
+const SETUP_ITEMS = [
+  {
+    key: 'leveler',
+    label: 'Nivelar volumen',
+    description: 'Comprime el audio para que los canales fuertes y los suaves suenen parecido',
+  },
+];
 const addForm = {
   el: document.getElementById('osd-add'),
   source: document.querySelector('#osd-add [name=source]'),
@@ -97,6 +109,10 @@ let categoryIndex = 0;
 // Categoría resaltada en el menú (c), o null con el menú cerrado. Después de
 // las categorías va "Agregar canal" (índice categories.length).
 let menuIndex = null;
+// Menú de ajustes (o): índice de la fila elegida, o null si está cerrado.
+let setupIndex = null;
+// Ajustes guardados por main.js en settings.json.
+let settings = { leveler: true };
 // Ocultos con Shift+H en cualquier categoría, hasta reiniciar: streams de la
 // config (por streamKey) y lives de canales (por videoId).
 const hiddenStreams = new Set();
@@ -857,6 +873,16 @@ function closeMenu() {
   menu.el.hidden = true;
 }
 
+// Íconos de Lucide para las acciones al final del menú.
+const ICON_PLUS = '<path d="M5 12h14"/><path d="M12 5v14"/>';
+const ICON_SLIDERS = '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/>';
+
+// Acciones al final del menú de categorías, después de las categorías.
+const MENU_ACTIONS = [
+  { icon: ICON_PLUS, name: 'Agregar canal', run: () => openAddForm() },
+  { icon: ICON_SLIDERS, name: 'Ajustes', run: () => openSetup() },
+];
+
 function renderMenu() {
   const item = (key, name) => {
     const li = document.createElement('li');
@@ -869,13 +895,17 @@ function renderMenu() {
     li.append(keyEl, nameEl);
     return li;
   };
-  const add = item('+', 'Agregar canal');
-  add.className = 'action';
+  const actions = MENU_ACTIONS.map((action, k) => {
+    const li = item('', action.name);
+    li.className = k ? 'action next' : 'action';
+    li.firstChild.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${action.icon}</svg>`;
+    return li;
+  });
   menu.list.replaceChildren(...categories.map((category, k) => {
     const li = item(k < 9 ? String(k + 1) : '', category.name);
     li.classList.toggle('current', k === categoryIndex);
     return li;
-  }), add);
+  }), ...actions);
   menu.list.children[menuIndex].classList.add('selected');
 }
 
@@ -886,7 +916,7 @@ function pickCategory(i) {
 
 // Con el menú abierto las demás teclas no hacen nada, como en un televisor.
 function onMenuKey(e) {
-  const n = categories.length + 1;
+  const n = categories.length + MENU_ACTIONS.length;
   switch (e.key) {
     case 'ArrowUp': case 'k':
       menuIndex = (menuIndex - 1 + n) % n;
@@ -897,15 +927,79 @@ function onMenuKey(e) {
       renderMenu();
       break;
     case 'Enter': case ' ':
-      if (menuIndex === categories.length) openAddForm();
+      if (menuIndex >= categories.length) MENU_ACTIONS[menuIndex - categories.length].run();
       else pickCategory(menuIndex);
       break;
     case 'a': openAddForm(); break;
+    case 'o': openSetup(); break;
     case 'c': case 'Escape': closeMenu(); break;
     default:
       if (/^[1-9]$/.test(e.key) && Number(e.key) <= categories.length) pickCategory(Number(e.key) - 1);
   }
   e.preventDefault();
+}
+
+// Menú de ajustes (o, o desde el menú de categorías): ↑↓ para elegir, Enter
+// para cambiar. Cada cambio se guarda al momento.
+function openSetup() {
+  closeMenu();
+  setupIndex = 0;
+  renderSetup();
+  setupMenu.el.hidden = false;
+}
+
+function closeSetup() {
+  setupIndex = null;
+  setupMenu.el.hidden = true;
+}
+
+function renderSetup() {
+  setupMenu.list.replaceChildren(...SETUP_ITEMS.map((item, k) => {
+    const li = document.createElement('li');
+    const text = document.createElement('div');
+    const label = document.createElement('div');
+    const description = document.createElement('div');
+    const toggle = document.createElement('span');
+    text.className = 'osd-setup-text';
+    label.textContent = item.label;
+    description.className = 'osd-setup-description';
+    description.textContent = item.description;
+    toggle.className = settings[item.key] ? 'switch on' : 'switch';
+    text.append(label, description);
+    li.append(text, toggle);
+    li.classList.toggle('selected', k === setupIndex);
+    return li;
+  }));
+}
+
+function onSetupKey(e) {
+  const n = SETUP_ITEMS.length;
+  switch (e.key) {
+    case 'ArrowUp': case 'k':
+      setupIndex = (setupIndex - 1 + n) % n;
+      renderSetup();
+      break;
+    case 'ArrowDown': case 'j':
+      setupIndex = (setupIndex + 1) % n;
+      renderSetup();
+      break;
+    case 'Enter': case ' ': {
+      const { key } = SETUP_ITEMS[setupIndex];
+      changeSettings({ [key]: !settings[key] });
+      break;
+    }
+    case 'o': case 'Escape': closeSetup(); break;
+  }
+  e.preventDefault();
+}
+
+// Aplica los ajustes aquí (los videos HLS del renderer) y los guarda; main.js
+// los aplica en los iframes de YouTube.
+async function changeSettings(changes) {
+  settings = { ...settings, ...changes };
+  window.livetvLeveler(settings.leveler);
+  renderSetup();
+  settings = await window.livetv.setSettings(changes);
 }
 
 // Formulario "Agregar canal" (desde el menú de categorías). El stream se
@@ -1150,6 +1244,10 @@ function onKey(e) {
     onMenuKey(e);
     return;
   }
+  if (setupIndex !== null) {
+    onSetupKey(e);
+    return;
+  }
   const tile = tiles[focusIndex];
   switch (e.key) {
     case 'ArrowLeft': case 'h': moveFocus(-1, 0); break;
@@ -1176,6 +1274,7 @@ function onKey(e) {
       break;
     case 'H': askHide(tile); break;
     case 'c': openMenu(); break;
+    case 'o': openSetup(); break;
     case '[': case 'PageUp': stepCategory(-1); break;
     case ']': case 'PageDown': stepCategory(1); break;
     case 's':
@@ -1247,6 +1346,8 @@ async function main() {
     if (document.activeElement?.tagName === 'IFRAME') document.activeElement.blur();
   }, 0));
 
+  settings = await window.livetv.getSettings();
+  window.livetvLeveler(settings.leveler);
   const config = await window.livetv.getConfig();
   if (config.error) {
     showMessage(config.error);

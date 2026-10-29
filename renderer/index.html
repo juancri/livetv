@@ -51,6 +51,13 @@
       <div class="osd-keys"><kbd>Enter</kbd> guardar · <kbd>↑</kbd><kbd>↓</kbd> campo · <kbd>←</kbd><kbd>→</kbd> categoría · <kbd>Esc</kbd> cancelar</div>
     </div>
   </div>
+  <div id="osd-setup" class="osd osd-scrim" hidden>
+    <div class="dialog" role="dialog">
+      <h2>Ajustes</h2>
+      <ol class="osd-menu-list osd-setup-list"></ol>
+      <div class="osd-keys"><kbd>↑</kbd><kbd>↓</kbd> elegir · <kbd>Enter</kbd> cambiar · <kbd>Esc</kbd> cerrar</div>
+    </div>
+  </div>
   <div id="help" class="osd-glass" hidden>
     <span><kbd>←↑→↓</kbd> <kbd>hjkl</kbd> mover foco</span> ·
     <span><kbd>1–9</kbd> ir a canal</span> ·
@@ -61,12 +68,14 @@
     <span><kbd>s</kbd> mostrar sin señal</span> ·
     <span><kbd>Shift+H</kbd> ocultar</span> ·
     <span><kbd>c</kbd> categorías</span> ·
+    <span><kbd>o</kbd> ajustes</span> ·
     <span><kbd>[</kbd> <kbd>]</kbd> <kbd>RePág</kbd> <kbd>AvPág</kbd> categoría anterior/siguiente</span> ·
     <span><kbd>f</kbd> <kbd>F11</kbd> pantalla completa</span> ·
     <span><kbd>?</kbd> ayuda</span> ·
     <span><kbd>q</kbd> salir</span>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.19/dist/hls.min.js"></script>
+  <script src="leveler.js"></script>
   <script src="app.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
 </body>

@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('livetv', {
   findMarket: (value) => ipcRenderer.invoke('find-market', value),
   priceHistory: (tokenId) => ipcRenderer.invoke('price-history', tokenId),
   addStream: (args) => ipcRenderer.invoke('add-stream', args),
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  setSettings: (changes) => ipcRenderer.invoke('set-settings', changes),
   toggleFullscreen: () => ipcRenderer.send('toggle-fullscreen'),
   quit: () => ipcRenderer.send('quit'),
 });
