@@ -138,6 +138,109 @@ const decodeEntities = (s) => s
   .replace(/&#x([\da-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
   .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 
+// Programación de un canal para la guía, desde mi.tv (stream.epg =
+// "mi.tv/<país>/<canal>", el país y el id como en las URLs de mi.tv). La
+// página de cada día trae los programas en orden con la hora de inicio en UTC;
+// si la hora retrocede, ya es el día siguiente. Se piden ayer, hoy y mañana
+// (UTC) para tener lo que está al aire y lo que viene; cada programa dura hasta
+// que empieza el siguiente. Devuelve { logo, programs: [{ start, stop, title,
+// category, description }] } con tiempos en ms.
+const SCHEDULE_TTL_MS = 30 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const scheduleCache = new Map();
+
+async function findSchedule(epg) {
+  const m = /^mi\.tv\/([a-z]{2})\/([\w-]+)$/.exec(epg || '');
+  if (!m) throw new Error(`epg no reconocido: ${epg}`);
+  const cached = scheduleCache.get(epg);
+  if (cached && Date.now() - cached.at < SCHEDULE_TTL_MS) return cached.data;
+  const [, country, id] = m;
+  const today = Math.floor(Date.now() / DAY_MS) * DAY_MS;
+  const pages = await Promise.all([-1, 0, 1].map(async (k) => {
+    const day = today + k * DAY_MS;
+    const date = new Date(day).toISOString().slice(0, 10);
+    try {
+      return { day, html: await fetchPage(`https://mi.tv/${country}/async/channel/${id}/${date}/0`) };
+    } catch {
+      return null;
+    }
+  }));
+  const text = (html) => decodeEntities((html || '').replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
+  let logo = null;
+  // Las páginas se solapan (lo de pasada la medianoche sale en dos días): por inicio.
+  const byStart = new Map();
+  for (const page of pages.filter(Boolean)) {
+    logo ||= /<div class="channel-info">\s*<img src="([^"]+)"/.exec(page.html)?.[1] || null;
+    let base = page.day;
+    let prev = -Infinity;
+    for (const [, item] of page.html.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/g)) {
+      const time = /class="time">\s*(\d{1,2}):(\d{2})/.exec(item);
+      if (!time) continue;
+      let start = base + (Number(time[1]) * 60 + Number(time[2])) * 60000;
+      if (start < prev) {
+        base += DAY_MS;
+        start += DAY_MS;
+      }
+      prev = start;
+      byStart.set(start, {
+        start,
+        title: text(/<h2>([\s\S]*?)<\/h2>/.exec(item)?.[1]),
+        category: text(/class="sub-title">([\s\S]*?)<\/span>/.exec(item)?.[1]),
+        description: text(/class="synopsis">([\s\S]*?)<\/p>/.exec(item)?.[1]),
+      });
+    }
+  }
+  const programs = [...byStart.values()].sort((a, b) => a.start - b.start);
+  programs.forEach((p, k) => { p.stop = programs[k + 1]?.start ?? p.start + 60 * 60000; });
+  if (!programs.length) throw new Error(`mi.tv no trajo programación para ${epg}`);
+  const data = { logo, programs };
+  scheduleCache.set(epg, { at: Date.now(), data });
+  return data;
+}
+
+// Logo de un canal para el OSD de canal y la guía: el de mi.tv si el stream
+// tiene epg (logos de la señal, pensados para fondo claro: plate), si no el
+// avatar del canal de YouTube (og:image de la página del canal o, para un
+// video suelto, el de su dueño). null si no hay. Se piden de a uno, en cola,
+// para no sumar una ráfaga de páginas de YouTube a la búsqueda de lives al
+// abrir una categoría; un resultado vacío se vuelve a intentar la próxima vez.
+const logoCache = new Map();
+let logoQueue = Promise.resolve();
+
+function findLogo(stream) {
+  const key = stream.epg || stream.channel || stream.url;
+  if (!key) return null;
+  if (!logoCache.has(key)) {
+    const job = logoQueue.then(() => fetchLogo(stream)).catch(() => null);
+    logoQueue = job;
+    logoCache.set(key, job.then((logo) => {
+      if (!logo) logoCache.delete(key);
+      return logo;
+    }));
+  }
+  return logoCache.get(key);
+}
+
+async function fetchLogo(stream) {
+  // Avatar a 176 px: alcanza para el OSD y pesa poco.
+  const avatar = (url) => ({ url: url.replace(/=s\d+-/, '=s176-'), plate: false });
+  if (stream.epg) {
+    const logo = await findSchedule(stream.epg).then((d) => d.logo, () => null);
+    if (logo) return { url: logo, plate: true };
+  }
+  if (stream.channel) {
+    const page = await fetchPage(channelUrl(stream.channel));
+    const m = /<meta property="og:image" content="([^"]+)"/.exec(page);
+    return m ? avatar(decodeEntities(m[1])) : null;
+  }
+  if (stream.url && /(^|\.)(youtube\.com|youtu\.be)$/.test(new URL(stream.url).hostname)) {
+    const page = await fetchPage(stream.url);
+    const m = /"videoOwnerRenderer":\{"thumbnail":\{"thumbnails":\[\{"url":"([^"]+)"/.exec(page);
+    return m ? avatar(m[1]) : null;
+  }
+  return null;
+}
+
 // Nombre para un stream agregado sin nombre: el título del canal, del video o
 // del evento de Polymarket, o "Windy". Si no se puede averiguar queda sin nombre.
 async function guessName(stream) {
@@ -295,6 +398,8 @@ ipcMain.handle('find-lives', (_e, channel) => findLives(channel));
 ipcMain.handle('find-market', (_e, value) => findMarket(value));
 ipcMain.handle('price-history', (_e, tokenId) => priceHistory(tokenId));
 ipcMain.handle('add-stream', (_e, args) => addStream(args));
+ipcMain.handle('find-schedule', (_e, epg) => findSchedule(epg));
+ipcMain.handle('find-logo', (_e, stream) => findLogo(stream));
 ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('set-settings', (e, changes) => saveSettings(BrowserWindow.fromWebContents(e.sender), changes));
 ipcMain.on('toggle-fullscreen', (e) => {

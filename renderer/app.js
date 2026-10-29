@@ -20,6 +20,17 @@ const MARKET_WS = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const MARKET_PING_MS = 10000;
 const MARKET_RECONNECT_MS = 5000;
 const MARKET_ROWS = 4;
+// Guía de programación, en px a 1920×1080 como los OSD: ancho de la columna de
+// canales más el espacio que la separa de la línea de tiempo, px por minuto y
+// alto de cada fila con su separación.
+const GUIDE_TIMELINE_X = 308;
+const GUIDE_PPM = 9.5;
+const GUIDE_ROW_H = 112;
+const GUIDE_REFRESH_MS = 30000;
+// Espera antes de pasar la vista previa (y el audio) al canal elegido en la
+// guía, para que recorrer la lista no haga sonar cada canal.
+const GUIDE_PREVIEW_MS = 500;
+const MINUTE_MS = 60000;
 // Como polymarket.com: con un spread mayor se muestra el último trade, no el punto medio.
 const MARKET_MAX_SPREAD = 0.1;
 // El embed de Windy muestra el pronóstico del momento en que cargó: se recarga cada hora.
@@ -27,6 +38,7 @@ const WINDY_RELOAD_MS = 3600000;
 // Modelos de Windy que pueden aparecer en la URL de windy.com junto a la capa.
 const WINDY_PRODUCTS = ['ecmwf', 'gfs', 'icon', 'iconEu', 'iconD2', 'nam', 'namConus', 'arome', 'ukv', 'hrrr', 'ecmwfWaves', 'gfsWaves', 'iconWaves', 'cams'];
 const DAY_S = 86400;
+const DAY_MS = DAY_S * 1000;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const grid = document.getElementById('grid');
@@ -40,6 +52,8 @@ const osd = {
 };
 const channelOsd = {
   el: document.getElementById('osd-channel'),
+  logo: document.querySelector('#osd-channel .osd-logo'),
+  tile: null,
   number: document.querySelector('#osd-channel .osd-number'),
   name: document.querySelector('#osd-channel .osd-name'),
   category: document.querySelector('#osd-channel .osd-category'),
@@ -61,6 +75,29 @@ const SETUP_ITEMS = [
     description: 'Comprime el audio para que los canales fuertes y los suaves suenen parecido',
   },
 ];
+const guide = {
+  el: document.getElementById('osd-guide'),
+  badge: document.querySelector('#osd-guide .guide-badge'),
+  channel: document.querySelector('#osd-guide .guide-channel'),
+  title: document.querySelector('#osd-guide .guide-title'),
+  time: document.querySelector('#osd-guide .guide-time'),
+  description: document.querySelector('#osd-guide .guide-description'),
+  clock: document.querySelector('#osd-guide .guide-clock'),
+  art: document.querySelector('#osd-guide .guide-art'),
+  ruler: document.querySelector('#osd-guide .guide-ruler'),
+  rows: document.querySelector('#osd-guide .guide-rows-inner'),
+  now: document.querySelector('#osd-guide .guide-now'),
+  // Programación por stream.epg: { data } o { error }; sin entrada, cargando.
+  schedules: new Map(),
+  timer: null,
+  previewTimer: null,
+};
+// Fila (índice en guideGroups) y momento elegidos en la guía; null si está cerrada.
+let guideRow = null;
+let guideTime = 0;
+let guideGroups = [];
+// Tile que se ve en vivo en el recuadro de la guía; suena él mientras esté abierta.
+let previewTile = null;
 const addForm = {
   el: document.getElementById('osd-add'),
   source: document.querySelector('#osd-add [name=source]'),
@@ -236,6 +273,9 @@ function setOffline(tile, offline) {
 
 // OSD de canal en la esquina superior derecha de la ventana.
 function showChannelOsd(tile) {
+  channelOsd.tile = tile;
+  loadLogo(tile.stream);
+  renderLogo(channelOsd.logo, tile.stream, '');
   channelOsd.number.textContent = tile.number;
   channelOsd.name.textContent = tile.name;
   channelOsd.category.textContent = categories.length > 1 ? categories[categoryIndex].name : '';
@@ -250,6 +290,7 @@ function showChannelOsd(tile) {
 // el video visible más cercano antes del foco. Al cerrar un live extra el
 // foco pasa un momento por el tile fijo del canal, que suele estar sin señal.
 function audioSource() {
+  if (previewTile && !isSilent(previewTile.stream)) return previewTile;
   const focused = tiles[focusIndex];
   if (focused && !isSilent(focused.stream)) return focused;
   if (!visible.includes(tiles.indexOf(audioTile))) {
@@ -819,6 +860,40 @@ function buildGrid(streams) {
 
 // Agrega al final del mosaico el tile fijo de un stream de la config. No
 // arranca el player: falta layout() y startGroup().
+// Logos de canal por streamKey: { url, plate } (plate: logo de la señal, va
+// sobre fondo claro) o null si no hay. main.js los busca (mi.tv o YouTube).
+const logos = new Map();
+const logoRequests = new Set();
+
+function loadLogo(stream) {
+  const key = streamKey(stream);
+  if (!key || logos.get(key) || logoRequests.has(key)) return;
+  logoRequests.add(key);
+  window.livetv.findLogo(stream)
+    .then((logo) => {
+      logos.set(key, logo);
+      if (channelOsd.tile?.stream === stream && !channelOsd.el.hidden) renderLogo(channelOsd.logo, stream, '');
+      if (guideRow !== null) renderGuide();
+    })
+    .catch(() => {})
+    .finally(() => logoRequests.delete(key));
+}
+
+// Logo del stream en `el`, o `initials` como texto si no hay.
+function renderLogo(el, stream, initials) {
+  const logo = logos.get(streamKey(stream));
+  el.classList.toggle('plate', !!logo?.plate);
+  if (logo) {
+    if (el.firstChild?.src === logo.url) return;
+    const img = document.createElement('img');
+    img.src = logo.url;
+    img.alt = '';
+    el.replaceChildren(img);
+  } else {
+    el.textContent = initials;
+  }
+}
+
 function addGroup(stream, hidden) {
   const name = stream.name || streamKey(stream) || 'Sin canal';
   const group = { stream, index: groups.length, name, tiles: [], timer: null, sync: null };
@@ -829,6 +904,7 @@ function addGroup(stream, hidden) {
   tiles.push(tile);
   grid.append(tile.el);
   renumber(group);
+  loadLogo(stream);
   return group;
 }
 
@@ -1015,6 +1091,266 @@ async function changeSettings(changes) {
   window.livetvLeveler(settings.leveler);
   renderSetup();
   settings = await window.livetv.setSettings(changes);
+}
+
+// Guía de programación (g): una fila por canal de la categoría. Los que tienen
+// stream.epg muestran la programación de mi.tv; el resto, un solo bloque con
+// el título de su live (o el nombre del canal). Enter sintoniza el canal.
+function openGuide() {
+  guideGroups = groups.filter((g) => g.tiles.some((t) => !t.hidden));
+  if (!guideGroups.length) return;
+  const focused = tiles[focusIndex];
+  guideRow = Math.max(0, guideGroups.indexOf(focused?.group));
+  guideTime = Date.now();
+  for (const { stream } of guideGroups) {
+    if (stream.epg && !guide.schedules.get(stream.epg)?.data) loadSchedule(stream.epg);
+  }
+  guide.el.hidden = false;
+  renderGuide();
+  // El canal con foco ya está sonando: su vista previa va sin espera.
+  setPreview(guideTile(guideGroups[guideRow]));
+  guide.timer = setInterval(renderGuide, GUIDE_REFRESH_MS);
+}
+
+function closeGuide() {
+  guideRow = null;
+  guide.el.hidden = true;
+  clearInterval(guide.timer);
+  clearTimeout(guide.previewTimer);
+  setPreview(null);
+}
+
+// Tile del canal que se ve y se sintoniza desde la guía: el primero en el mosaico.
+function guideTile(group) {
+  return group.tiles.find((t) => visible.includes(tiles.indexOf(t))) || null;
+}
+
+// Vista previa en vivo: el tile mismo, reposicionado sobre el recuadro de la
+// guía (moverlo en el DOM recargaría el reproductor). El audio lo sigue.
+function setPreview(tile) {
+  if (previewTile) previewTile.el.classList.remove('guide-preview');
+  previewTile = tile;
+  if (tile) {
+    tile.el.classList.add('guide-preview');
+    placePreview();
+  }
+  applyAudio();
+}
+
+function placePreview() {
+  if (!previewTile) return;
+  const r = guide.art.getBoundingClientRect();
+  const { style } = previewTile.el;
+  style.setProperty('--preview-left', `${r.left}px`);
+  style.setProperty('--preview-top', `${r.top}px`);
+  style.setProperty('--preview-width', `${r.width}px`);
+  style.setProperty('--preview-height', `${r.height}px`);
+}
+
+function schedulePreview(group) {
+  const tile = guideTile(group);
+  clearTimeout(guide.previewTimer);
+  if (tile === previewTile) return;
+  guide.previewTimer = setTimeout(() => setPreview(tile), GUIDE_PREVIEW_MS);
+}
+
+// main.js guarda la programación media hora; aquí se vuelve a pedir al abrir.
+function loadSchedule(epg) {
+  guide.schedules.delete(epg);
+  window.livetv.findSchedule(epg)
+    .then((data) => guide.schedules.set(epg, { data }))
+    .catch((err) => {
+      console.warn(`No se pudo leer la programación ${epg}:`, err);
+      guide.schedules.set(epg, { error: true });
+    })
+    .finally(() => { if (guideRow !== null) renderGuide(); });
+}
+
+// Título del live que está sonando en el canal, si se conoce.
+function liveTitle(group) {
+  for (const tile of group.tiles) {
+    if (tile.hidden || tile.offline) continue;
+    const title = tile.player?.getVideoData?.()?.title || tile.title;
+    if (title) return title;
+  }
+  return null;
+}
+
+// Programas de una fila. Sin programación queda un bloque que cubre todo el
+// rango visible (placeholder), con el título del live como "ahora".
+function guidePrograms(group) {
+  const now = Date.now();
+  const { epg } = group.stream;
+  const schedule = epg && guide.schedules.get(epg);
+  if (schedule?.data) return schedule.data.programs.filter((p) => p.stop > now);
+  const offline = group.tiles.every((t) => t.hidden || t.offline);
+  const title = offline ? 'Sin señal' : liveTitle(group) || group.name;
+  const description = epg && !schedule ? 'Cargando programación…'
+    : epg ? 'No se pudo cargar la programación.'
+      : offline ? '' : 'Sin programación: título del live que se está transmitiendo.';
+  return [{ start: now - DAY_MS, stop: now + DAY_MS, title, description, placeholder: true, offline }];
+}
+
+function guideLogo(group, el) {
+  renderLogo(el, group.stream, group.name.slice(0, 3));
+}
+
+const clock = (ms) => new Date(ms).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+// "20:00 – 21:30", con el día delante si no es hoy.
+function programTime(p) {
+  const day = new Date(p.start);
+  const today = new Date();
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  let prefix = '';
+  if (day.toDateString() === tomorrow.toDateString()) prefix = 'Mañana · ';
+  else if (day.toDateString() !== today.toDateString()) {
+    const name = day.toLocaleDateString('es-CL', { weekday: 'long' });
+    prefix = `${name[0].toUpperCase()}${name.slice(1)} · `;
+  }
+  return `${prefix}${clock(p.start)} – ${clock(p.stop)}`;
+}
+
+// Programa de la fila que está al aire en `time`, o el siguiente.
+function programAt(programs, time) {
+  const k = programs.findIndex((p) => p.stop > time);
+  return k < 0 ? programs.length - 1 : k;
+}
+
+function renderGuide() {
+  const now = Date.now();
+  const group = guideGroups[guideRow];
+  const programs = guidePrograms(group);
+  const focusedIndex = programAt(programs, Math.max(guideTime, now));
+  const focused = programs[focusedIndex];
+
+  // Detalle del programa elegido.
+  const airing = focused.start <= now;
+  guide.badge.className = airing ? 'badge badge-live guide-badge' : 'badge badge-outline guide-badge';
+  guide.badge.textContent = focused.offline ? '' : airing ? 'En vivo' : 'A continuación';
+  guide.channel.textContent = `${group.name} · ${group.tiles[0].number.replace(/-\d+$/, '')}`;
+  guide.title.textContent = focused.title;
+  guide.time.textContent = focused.offline ? '' : focused.placeholder ? 'Ahora' : programTime(focused);
+  guide.description.textContent = [focused.category, focused.description].filter(Boolean).join(' · ');
+  guide.clock.textContent = clock(now);
+  guideLogo(group, guide.art);
+
+  // Ventana de tiempo: desde la media hora en curso, corrida si el programa
+  // elegido empieza más allá de las dos horas.
+  const half = 30 * MINUTE_MS;
+  let start = Math.floor(now / half) * half;
+  if (!focused.placeholder && focused.start >= start + 4 * half) start = Math.floor(focused.start / half) * half - half;
+  const x = (t) => (t - start) / MINUTE_MS * GUIDE_PPM;
+
+  const marks = [];
+  const nowLabel = document.createElement('span');
+  nowLabel.className = 'guide-ruler-now';
+  nowLabel.textContent = start <= now ? 'Hoy' : programTime(focused).split(' · ')[0];
+  marks.push(nowLabel);
+  for (let t = start; t < start + 12 * half; t += half) {
+    const mark = document.createElement('span');
+    mark.className = 'guide-ruler-mark';
+    mark.style.left = `${GUIDE_TIMELINE_X + x(t)}px`;
+    mark.textContent = clock(t);
+    marks.push(mark);
+  }
+  guide.ruler.replaceChildren(...marks);
+  guide.now.hidden = now < start;
+  guide.now.style.left = `${GUIDE_TIMELINE_X + x(now)}px`;
+
+  guide.rows.replaceChildren(...guideGroups.map((g, k) => {
+    const row = document.createElement('div');
+    row.className = k === guideRow ? 'guide-row focused' : 'guide-row';
+    const channel = document.createElement('div');
+    channel.className = 'guide-row-channel';
+    const number = document.createElement('span');
+    number.className = 'guide-row-number';
+    number.textContent = g.tiles[0].number.replace(/-\d+$/, '');
+    const logo = document.createElement('span');
+    logo.className = 'guide-logo';
+    guideLogo(g, logo);
+    const name = document.createElement('span');
+    name.className = 'guide-row-name';
+    name.textContent = g.name;
+    channel.append(number, logo, name);
+
+    const line = document.createElement('div');
+    line.className = 'guide-row-programs';
+    const list = k === guideRow ? programs : guidePrograms(g);
+    for (const [i, p] of list.entries()) {
+      // Los bloques muy largos (placeholder) se cortan en el borde de la pantalla.
+      const left = Math.max(0, x(p.start));
+      const right = Math.min(x(p.stop), x(start + 24 * half));
+      if (right <= left) continue;
+      const block = document.createElement('div');
+      block.className = 'guide-program';
+      block.classList.toggle('airing', p.start <= now && !p.offline);
+      block.classList.toggle('placeholder', !!p.placeholder);
+      block.classList.toggle('focused', k === guideRow && i === focusedIndex);
+      block.style.left = `${left}px`;
+      block.style.width = `${right - left - 8}px`;
+      if (p.start <= now) {
+        block.style.setProperty('--progress', `${(now - p.start) / (p.stop - p.start) * 100}%`);
+        // El texto del programa al aire empieza después de la línea de ahora,
+        // salvo que no quede espacio para leerlo.
+        if (right - x(now) > 160) block.style.paddingLeft = `${Math.max(20, x(now) - left + 16)}px`;
+      }
+      const title = document.createElement('span');
+      title.className = 'guide-program-title';
+      title.textContent = p.title;
+      const time = document.createElement('span');
+      time.className = 'guide-program-time';
+      time.textContent = p.offline ? '' : p.placeholder ? 'En vivo' : `${clock(p.start)} – ${clock(p.stop)}`;
+      block.append(title, time);
+      line.append(block);
+    }
+    row.append(channel, line);
+    return row;
+  }));
+  guide.rows.style.transform = `translateY(${-Math.max(0, guideRow - 2) * GUIDE_ROW_H}px)`;
+  placePreview();
+  schedulePreview(group);
+}
+
+function onGuideKey(e) {
+  const n = guideGroups.length;
+  const now = Date.now();
+  switch (e.key) {
+    case 'ArrowUp': case 'k':
+      guideRow = (guideRow - 1 + n) % n;
+      break;
+    case 'ArrowDown': case 'j':
+      guideRow = (guideRow + 1) % n;
+      break;
+    case 'ArrowLeft': case 'h': case 'ArrowRight': case 'l': {
+      const programs = guidePrograms(guideGroups[guideRow]);
+      const k = programAt(programs, Math.max(guideTime, now));
+      const next = programs[Math.max(0, Math.min(programs.length - 1, k + (e.key === 'ArrowLeft' || e.key === 'h' ? -1 : 1)))];
+      // El programa al aire se elige con "ahora", los demás con su inicio.
+      guideTime = next.start <= now ? now : next.start;
+      break;
+    }
+    case 'Enter': case ' ':
+      tuneGuide();
+      return e.preventDefault();
+    case 'g': case 'Escape':
+      closeGuide();
+      return e.preventDefault();
+    default:
+      return e.preventDefault();
+  }
+  renderGuide();
+  e.preventDefault();
+}
+
+// Cierra la guía y deja el canal elegido con foco y ampliado.
+function tuneGuide() {
+  const group = guideGroups[guideRow];
+  closeGuide();
+  const target = group.tiles.map((t) => tiles.indexOf(t)).find((i) => visible.includes(i));
+  if (target === undefined) return;
+  setFocus(target);
+  if (!zoomed) setZoom(true);
 }
 
 // Formulario "Agregar canal" (desde el menú de categorías). El stream se
@@ -1263,6 +1599,10 @@ function onKey(e) {
     onSetupKey(e);
     return;
   }
+  if (guideRow !== null) {
+    onGuideKey(e);
+    return;
+  }
   const tile = tiles[focusIndex];
   switch (e.key) {
     case 'ArrowLeft': case 'h': moveFocus(-1, 0); break;
@@ -1290,6 +1630,7 @@ function onKey(e) {
     case 'H': askHide(tile); break;
     case 'c': openMenu(); break;
     case 'o': openSetup(); break;
+    case 'g': openGuide(); break;
     case '[': case 'PageUp': stepCategory(-1); break;
     case ']': case 'PageDown': stepCategory(1); break;
     case 's':
@@ -1352,7 +1693,10 @@ function showMessage(text) {
 async function main() {
   document.addEventListener('keydown', onKey);
   scaleOsd();
-  window.addEventListener('resize', scaleOsd);
+  window.addEventListener('resize', () => {
+    scaleOsd();
+    if (guideRow !== null) renderGuide();
+  });
   wakeCursor();
   document.addEventListener('mousemove', wakeCursor);
   document.addEventListener('mousedown', wakeCursor);

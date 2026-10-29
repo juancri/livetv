@@ -1,11 +1,12 @@
 /* Tokens del LiveTV Design System (claude.ai/design): tema oscuro, acento lima. */
 :root {
-  --ink-1000: #050608; --ink-950: #08090C; --ink-850: #14171E; --ink-700: #262B35;
+  --ink-1000: #050608; --ink-950: #08090C; --ink-850: #14171E; --ink-800: #1B1F27; --ink-700: #262B35; --ink-600: #353B47;
   --ink-500: #4A5160; --ink-300: #9098A8; --ink-200: #B8BECA; --ink-50: #F2F4F7; --white: #FFFFFF;
   --lime-400: #CFF752; --lime-500: #C2F02E; --red-500: #FF3D3D; --green-500: #3DDC84;
 
   --surface-1: #0E1015;
   --surface-2: var(--ink-850);
+  --surface-3: var(--ink-800);
   --surface-raised: var(--ink-700);
   --surface-glass: rgba(20, 23, 30, 0.72);
   --surface-scrim: rgba(5, 6, 8, 0.64);
@@ -382,6 +383,7 @@ kbd {
 .badge {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
   height: 34px;
   padding: 0 14px;
   border-radius: var(--radius-xs);
@@ -433,14 +435,38 @@ kbd {
 #osd.muted .icon { color: var(--text-tertiary); }
 #osd.muted .progress-fill { background: var(--text-disabled); }
 
-/* Canal: tarjeta arriba a la derecha con número, nombre y categoría. */
+/* Canal: tarjeta arriba a la derecha con el logo, la categoría, el número y
+   el nombre. */
 #osd-channel {
   top: var(--safe-y);
   right: var(--safe-x);
-  max-width: 960px;
-  padding: 24px 32px 28px;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  max-width: 1100px;
+  padding: 24px 36px 24px 24px;
 }
+.osd-channel-text { min-width: 0; }
+
+/* Logo de canal (renderLogo): el avatar de YouTube a sangre; el logo de la
+   señal (mi.tv, .plate) sobre una placa blanca, como en los decos. */
+.osd-logo {
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+.osd-logo:empty { display: none; }
+.osd-logo img,
+.guide-logo img { width: 100%; height: 100%; object-fit: cover; }
+.osd-logo.plate,
+.guide-logo.plate { background: var(--white); }
+.osd-logo.plate img,
+.guide-logo.plate img { object-fit: contain; padding: 8%; }
 .osd-category {
   margin-bottom: 10px;
   font: var(--text-caption);
@@ -449,7 +475,6 @@ kbd {
 .osd-category:empty { display: none; }
 .osd-channel-row {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
   gap: 16px;
 }
@@ -656,6 +681,267 @@ kbd {
   color: var(--danger);
 }
 .osd-add-error.busy { color: var(--text-secondary); }
+
+/* Guía de programación (g): a pantalla completa sobre el mosaico. Arriba el
+   detalle del programa elegido; abajo una fila por canal con sus programas
+   sobre una línea de tiempo (--guide-ppm px por minuto) y la línea roja de
+   ahora. Como GuideScreen/GuideRow/TimeRuler del design system. */
+#osd-guide {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--safe-y) var(--safe-x) 32px;
+  background: rgba(8, 9, 12, 0.94);
+  backdrop-filter: blur(12px);
+  animation: osd-fade var(--dur-base) var(--ease-out);
+}
+.guide-header {
+  display: flex;
+  gap: 48px;
+  height: 300px;
+  flex: none;
+}
+.guide-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 8px;
+}
+.guide-meta { display: flex; gap: 12px; align-items: center; }
+.guide-meta .badge:empty { display: none; }
+.guide-channel { font: var(--text-label); color: var(--text-secondary); }
+.guide-title {
+  font: 700 56px/1.15 var(--font-display);
+  letter-spacing: var(--tracking-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.guide-time { font: 500 22px/1 var(--font-mono); color: var(--text-secondary); }
+.guide-description {
+  margin: 0;
+  max-width: 1000px;
+  font: var(--text-body);
+  color: var(--text-tertiary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.guide-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 24px;
+}
+.guide-clock { font: 600 32px/1 var(--font-mono); color: var(--text-secondary); }
+.guide-art {
+  display: grid;
+  place-items: center;
+  width: 360px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+  font: 800 48px/1 var(--font-display);
+  letter-spacing: -0.04em;
+  color: var(--text-tertiary);
+  overflow: hidden;
+}
+.guide-art img {
+  height: 60%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+}
+.guide-art.plate img {
+  background: var(--white);
+  padding: 12px;
+  object-fit: contain;
+}
+
+.guide-grid {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 16px calc(-1 * var(--safe-x)) 0 0;
+  overflow: hidden;
+}
+.guide-ruler {
+  position: relative;
+  flex: none;
+  height: 48px;
+}
+.guide-ruler-now {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  translate: 0 -50%;
+  font: var(--text-label);
+  font-size: 20px;
+  color: var(--text-secondary);
+}
+.guide-ruler-mark {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  padding-left: 12px;
+  border-left: 2px solid var(--border-default);
+  font: 500 18px/28px var(--font-mono);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.guide-rows {
+  flex: 1;
+  min-height: 0;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.guide-rows-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.guide-now {
+  position: absolute;
+  top: 4px;
+  bottom: 0;
+  width: 3px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--live);
+  z-index: 5;
+}
+.guide-row {
+  display: flex;
+  gap: 8px;
+  height: 104px;
+  flex: none;
+}
+.guide-row-channel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 300px;
+  flex: none;
+  padding: 0 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  transition: background var(--dur-base);
+}
+.guide-row.focused .guide-row-channel { background: var(--surface-3); }
+.guide-row-number {
+  width: 64px;
+  flex: none;
+  font: 500 18px/1 var(--font-mono);
+  color: var(--text-tertiary);
+}
+.guide-logo {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: var(--radius-xs);
+  background: var(--surface-raised);
+  font: 800 16px/1 var(--font-display);
+  overflow: hidden;
+}
+.guide-row-name {
+  font: var(--text-label);
+  font-size: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.guide-row-programs {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+.guide-program {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  overflow: hidden;
+  transition: background var(--dur-base), color var(--dur-base);
+}
+.guide-program.airing { background: var(--surface-3); }
+.guide-program.airing::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--progress);
+  background: rgba(255, 255, 255, 0.04);
+}
+.guide-program.placeholder { color: var(--text-tertiary); }
+.guide-program.focused {
+  background: var(--white);
+  color: var(--ink-950);
+  box-shadow: var(--shadow-2);
+  z-index: 2;
+}
+.guide-program.focused::before { display: none; }
+.guide-program-title {
+  position: relative;
+  font: var(--text-label);
+  font-size: 21px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.guide-program-time {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font: 500 16px/1 var(--font-mono);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.guide-program.focused .guide-program-time { color: var(--ink-600); }
+.guide-program.airing .guide-program-time::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--live);
+}
+
+/* Vista previa en la guía: el tile del canal elegido, reposicionado sobre el
+   recuadro .guide-art (setPreview). El primer selector empata en
+   especificidad con el tile ampliado y gana por ir después. */
+#grid.zoomed .tile.guide-preview,
+#grid .tile.guide-preview {
+  position: fixed;
+  inset: auto;
+  left: var(--preview-left);
+  top: var(--preview-top);
+  width: var(--preview-width);
+  height: var(--preview-height);
+  z-index: 31;
+  visibility: visible;
+  border: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+}
+.tile.guide-preview .focus-ring,
+.tile.guide-preview .status { display: none; }
 
 /* Ayuda (?): atajos de teclado abajo al centro. */
 #help {

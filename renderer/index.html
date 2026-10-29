@@ -10,12 +10,15 @@
   <main id="grid"></main>
   <pre id="message" hidden></pre>
   <div id="osd-channel" class="osd osd-glass" hidden>
-    <div class="osd-category"></div>
-    <div class="osd-channel-row">
-      <span class="osd-number"></span>
-      <span class="badge badge-glass osd-muted">MUTE</span>
+    <div class="osd-logo"></div>
+    <div class="osd-channel-text">
+      <div class="osd-category"></div>
+      <div class="osd-channel-row">
+        <span class="osd-number"></span>
+        <span class="badge badge-glass osd-muted">MUTE</span>
+      </div>
+      <div class="osd-name"></div>
     </div>
-    <div class="osd-name"></div>
   </div>
   <div id="osd" class="osd osd-glass" hidden>
     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path class="icon-on" d="M16 9a5 5 0 0 1 0 6"/><path class="icon-on" d="M19.4 18.4a9 9 0 0 0 0-12.8"/><path class="icon-off" d="m16 9 6 6"/><path class="icon-off" d="m22 9-6 6"/></svg>
@@ -58,6 +61,26 @@
       <div class="osd-keys"><kbd>↑</kbd><kbd>↓</kbd> elegir · <kbd>Enter</kbd> cambiar · <kbd>Esc</kbd> cerrar</div>
     </div>
   </div>
+  <div id="osd-guide" class="osd" hidden>
+    <div class="guide-header">
+      <div class="guide-info">
+        <div class="guide-meta"><span class="badge guide-badge"></span><span class="guide-channel"></span></div>
+        <div class="guide-title"></div>
+        <div class="guide-time"></div>
+        <p class="guide-description"></p>
+      </div>
+      <div class="guide-side">
+        <div class="guide-clock"></div>
+        <div class="guide-art"></div>
+      </div>
+    </div>
+    <div class="guide-grid">
+      <div class="guide-ruler"></div>
+      <div class="guide-rows"><div class="guide-rows-inner"></div></div>
+      <div class="guide-now"></div>
+    </div>
+    <div class="osd-keys"><kbd>↑</kbd><kbd>↓</kbd> canal · <kbd>←</kbd><kbd>→</kbd> programa · <kbd>Enter</kbd> ver · <kbd>Esc</kbd> cerrar</div>
+  </div>
   <div id="help" class="osd-glass" hidden>
     <span><kbd>←↑→↓</kbd> <kbd>hjkl</kbd> mover foco</span> ·
     <span><kbd>1–9</kbd> ir a canal</span> ·
@@ -69,6 +92,7 @@
     <span><kbd>Shift+H</kbd> ocultar</span> ·
     <span><kbd>c</kbd> categorías</span> ·
     <span><kbd>o</kbd> ajustes</span> ·
+    <span><kbd>g</kbd> guía</span> ·
     <span><kbd>[</kbd> <kbd>]</kbd> <kbd>RePág</kbd> <kbd>AvPág</kbd> categoría anterior/siguiente</span> ·
     <span><kbd>f</kbd> <kbd>F11</kbd> pantalla completa</span> ·
     <span><kbd>?</kbd> ayuda</span> ·
