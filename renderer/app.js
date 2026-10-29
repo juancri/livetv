@@ -6,13 +6,14 @@ const CONFIRM_MS = 5000;
 const VOLUME_STEP = 5;
 const OSD_SEGMENTS = 50;
 const OSD_MS = 2500;
-const ZOOM_MS = 1400;
-const ZOOM_EASING = 'cubic-bezier(.45, 0, .25, 1)';
-// Fracción de la animación en que el tile queda flotando delante del mosaico.
-const ZOOM_HOLD = [0.35, 0.5];
-// Al despegarse, el tile crece ZOOM_LIFT veces y se acerca al centro (ZOOM_PULL = 0.9: 10 %).
+const ZOOM_MS = 900;
+// Se aplica a la animación entera; los keyframes intermedios van en línea recta.
+const ZOOM_EASING = 'cubic-bezier(.65, 0, .35, 1)';
+// Keyframes muestreados a lo largo del recorrido.
+const ZOOM_FRAMES = 24;
+// A mitad de camino el tile crece hasta ZOOM_LIFT veces e inclina ZOOM_TILT grados.
 const ZOOM_LIFT = 1.15;
-const ZOOM_PULL = 0.9;
+const ZOOM_TILT = [10, 6];
 const PERSPECTIVE = 'perspective(1200px)';
 const MARKET_WS = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const MARKET_PING_MS = 10000;
@@ -1018,12 +1019,15 @@ function layout() {
   }
 }
 
-// Amplía o reduce el tile enfocado en dos pasos: primero se despega del
-// mosaico y queda flotando delante (el resto se desenfoca y oscurece), y luego
-// vuela hacia la cámara hasta cubrir la pantalla. Es un FLIP: el tile ya está en
-// pantalla completa (el iframe con su tamaño final) y se anima su transform
-// desde la celda. Se animan los tiles y no #grid: un ancestro con transform
-// rompería el position: fixed del tile ampliado.
+// Amplía o reduce el tile enfocado en un solo movimiento continuo: viaja de
+// su celda a la pantalla completa mientras se despega del mosaico (crece algo
+// más e inclina hacia el centro, con el máximo a mitad de camino) y el resto se
+// desenfoca, oscurece y se aleja. Es un FLIP: el tile ya está en pantalla
+// completa (el iframe con su tamaño final) y se anima su transform desde la
+// celda. El recorrido se muestrea en ZOOM_FRAMES keyframes lineales y la easing
+// se aplica a la animación entera, así no frena en ningún punto intermedio. Se
+// animan los tiles y no #grid: un ancestro con transform rompería el
+// position: fixed del tile ampliado.
 function setZoom(on) {
   zoomEnd?.();
   if (on === zoomed) return;
@@ -1037,35 +1041,40 @@ function setZoom(on) {
   const dy = r.top + r.height / 2 - H / 2;
   const sx = r.width / W;
   const sy = r.height / H;
-  const cell = `${PERSPECTIVE} translate(${dx}px, ${dy}px) scale(${sx}, ${sy}) rotateY(0deg) rotateX(0deg)`;
-  // Despegado: algo más grande, un poco hacia el centro e inclinado hacia él.
-  const lifted = `${PERSPECTIVE} translate(${dx * ZOOM_PULL}px, ${dy * ZOOM_PULL}px) ` +
-    `scale(${sx * ZOOM_LIFT}, ${sy * ZOOM_LIFT}) ` +
-    `rotateY(${(Math.sign(dx) || 1) * -10}deg) rotateX(${(Math.sign(dy) || 1) * 6}deg)`;
-  const full = `${PERSPECTIVE} translate(0px, 0px) scale(1, 1) rotateY(0deg) rotateX(0deg)`;
-  // Al reducir se recorren los mismos keyframes al revés (Enter o Escape).
-  const frames = (list) => (on ? list : list.map((f) => ({ ...f, offset: 1 - f.offset })).reverse());
-  const step = (offset, props) => ({ offset, easing: ZOOM_EASING, ...props });
-  const opts = { duration: ZOOM_MS };
+  const tiltY = (Math.sign(dx) || 1) * -ZOOM_TILT[0];
+  const tiltX = (Math.sign(dy) || 1) * ZOOM_TILT[1];
+  // p va de 0 (celda) a 1 (pantalla completa); lift sube y baja con máximo en 0.5.
+  const tileFrame = (p) => {
+    const lift = Math.sin(Math.PI * p);
+    const grow = 1 + (ZOOM_LIFT - 1) * lift;
+    const glow = 0.35 * lift;
+    const shade = 0.9 * lift;
+    return {
+      transform: `${PERSPECTIVE} translate(${dx * (1 - p)}px, ${dy * (1 - p)}px) ` +
+        `scale(${(sx + (1 - sx) * p) * grow}, ${(sy + (1 - sy) * p) * grow}) ` +
+        `rotateY(${tiltY * lift}deg) rotateX(${tiltX * lift}deg)`,
+      boxShadow: `0 0 ${60 * lift}px rgba(60, 255, 60, ${glow}), 0 ${30 * lift}px ${80 * lift}px rgba(0, 0, 0, ${shade})`,
+    };
+  };
+  const otherFrame = (p) => ({
+    transform: `${PERSPECTIVE} translateZ(${-300 * p}px)`,
+    filter: `blur(${16 * p}px) brightness(${1 - 0.85 * p})`,
+    opacity: Math.min(1, 2 - 2 * p),
+  });
+  // Al reducir se recorre el mismo camino al revés (Enter o Escape).
+  const frames = (fn) => Array.from({ length: ZOOM_FRAMES + 1 }, (_, i) => {
+    const offset = i / ZOOM_FRAMES;
+    return { offset, ...fn(on ? offset : 1 - offset) };
+  });
+  const opts = { duration: ZOOM_MS, easing: ZOOM_EASING };
   grid.classList.add('zoomed', 'zooming');
   const others = [
     ...visible.filter((i) => i !== focusIndex).map((i) => tiles[i].el),
     ...grid.querySelectorAll('.empty'),
   ];
-  const glow = '0 0 60px rgba(60, 255, 60, 0.35), 0 30px 80px rgba(0, 0, 0, 0.9)';
   const anims = [
-    tile.el.animate(frames([
-      step(0, { transform: cell, boxShadow: '0 0 0 transparent, 0 0 0 transparent' }),
-      step(ZOOM_HOLD[0], { transform: lifted, boxShadow: glow }),
-      step(ZOOM_HOLD[1], { transform: lifted, boxShadow: glow }),
-      step(1, { transform: full, boxShadow: '0 0 0 transparent, 0 0 0 transparent' }),
-    ]), opts),
-    ...others.map((el) => el.animate(frames([
-      step(0, { transform: `${PERSPECTIVE} translateZ(0px)`, filter: 'blur(0px) brightness(1)', opacity: 1 }),
-      step(ZOOM_HOLD[0], { transform: `${PERSPECTIVE} translateZ(-80px)`, filter: 'blur(8px) brightness(0.45)', opacity: 1 }),
-      step(ZOOM_HOLD[1], { transform: `${PERSPECTIVE} translateZ(-80px)`, filter: 'blur(8px) brightness(0.45)', opacity: 1 }),
-      step(1, { transform: `${PERSPECTIVE} translateZ(-300px)`, filter: 'blur(16px) brightness(0.15)', opacity: 0 }),
-    ]), opts)),
+    tile.el.animate(frames(tileFrame), opts),
+    ...others.map((el) => el.animate(frames(otherFrame), opts)),
   ];
   // Al terminar, o si se vuelve a pulsar Enter a medio camino, queda el estado final.
   const end = zoomEnd = () => {
