@@ -3,42 +3,68 @@
 <head>
   <meta charset="utf-8">
   <title>LiveTV</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Sora:wght@600;700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main id="grid"></main>
   <pre id="message" hidden></pre>
-  <div id="osd-channel" class="osd" hidden>
+  <div id="osd-channel" class="osd osd-glass" hidden>
     <div class="osd-category"></div>
-    <div class="osd-number"></div>
+    <div class="osd-channel-row">
+      <span class="osd-number"></span>
+      <span class="badge badge-glass osd-muted">MUTE</span>
+    </div>
     <div class="osd-name"></div>
   </div>
-  <div id="osd" class="osd" hidden>
-    <div class="osd-row"><span class="osd-label"></span><span class="osd-value"></span></div>
-    <div class="osd-bar"></div>
+  <div id="osd" class="osd osd-glass" hidden>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path class="icon-on" d="M16 9a5 5 0 0 1 0 6"/><path class="icon-on" d="M19.4 18.4a9 9 0 0 0 0-12.8"/><path class="icon-off" d="m16 9 6 6"/><path class="icon-off" d="m22 9-6 6"/></svg>
+    <span class="osd-label"></span>
+    <div class="progress"><div class="progress-fill"></div></div>
+    <span class="osd-value"></span>
   </div>
-  <div id="osd-confirm" class="osd" hidden>
-    <div class="osd-confirm-title"></div>
-    <div class="osd-confirm-keys">H = SÍ · ESC = NO</div>
+  <div id="osd-confirm" class="osd osd-scrim" hidden>
+    <div class="dialog" role="dialog">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.7 5.1A10.8 10.8 0 0 1 22 12a10.8 10.8 0 0 1-1.4 2.2"/><path d="M14.1 14.2a3 3 0 0 1-4.2-4.2"/><path d="M17.5 17.5A10.8 10.8 0 0 1 2 12a10.8 10.8 0 0 1 4.4-5.5"/><path d="m2 2 20 20"/></svg>
+      <h2 class="osd-confirm-title"></h2>
+      <p class="dialog-body">Se oculta en todas las categorías hasta reiniciar.</p>
+      <div class="dialog-actions">
+        <span class="button button-primary"><kbd>H</kbd>Ocultar</span>
+        <span class="button button-secondary"><kbd>Esc</kbd>Cancelar</span>
+      </div>
+    </div>
   </div>
-  <div id="osd-menu" class="osd" hidden>
-    <div class="osd-menu-title">CATEGORÍAS</div>
-    <ol class="osd-menu-list"></ol>
-    <div class="osd-menu-keys">↑↓ ELEGIR · ENTER VER · ESC SALIR</div>
+  <div id="osd-menu" class="osd osd-scrim" hidden>
+    <div class="dialog" role="dialog">
+      <h2>Categorías</h2>
+      <ol class="osd-menu-list"></ol>
+      <div class="osd-keys"><kbd>↑</kbd><kbd>↓</kbd> elegir · <kbd>Enter</kbd> ver · <kbd>Esc</kbd> cerrar</div>
+    </div>
   </div>
-  <div id="osd-add" class="osd" hidden>
-    <div class="osd-menu-title">AGREGAR CANAL</div>
-    <label class="osd-field">URL O CANAL<input name="source" spellcheck="false" autocomplete="off" placeholder="@canal · URL de YouTube · .m3u8 · Polymarket"></label>
-    <label class="osd-field">NOMBRE<input name="name" spellcheck="false" autocomplete="off" placeholder="opcional"></label>
-    <div class="osd-field osd-field-category" tabindex="0">CATEGORÍA<span class="osd-add-category"></span></div>
-    <div class="osd-add-error"></div>
-    <div class="osd-menu-keys">ENTER GUARDAR · ↑↓ CAMPO · ←→ CATEGORÍA · ESC CANCELAR</div>
+  <div id="osd-add" class="osd osd-scrim" hidden>
+    <div class="dialog" role="dialog">
+      <h2>Agregar canal</h2>
+      <label class="osd-field"><span class="osd-field-label">URL o canal</span><input name="source" spellcheck="false" autocomplete="off" placeholder="@canal · URL de YouTube · .m3u8 · Polymarket"></label>
+      <label class="osd-field"><span class="osd-field-label">Nombre</span><input name="name" spellcheck="false" autocomplete="off" placeholder="Opcional"></label>
+      <div class="osd-field osd-field-category" tabindex="0"><span class="osd-field-label">Categoría</span><span class="osd-select"><span class="osd-chevron">‹</span><span class="osd-add-category"></span><span class="osd-chevron">›</span></span></div>
+      <div class="osd-add-error"></div>
+      <div class="osd-keys"><kbd>Enter</kbd> guardar · <kbd>↑</kbd><kbd>↓</kbd> campo · <kbd>←</kbd><kbd>→</kbd> categoría · <kbd>Esc</kbd> cancelar</div>
+    </div>
   </div>
-  <div id="help" hidden>
-    <b>←↑→↓ / hjkl</b> mover foco · <b>1–9</b> ir a canal · <b>Enter</b> ampliar ·
-    <b>m</b> silenciar · <b>+/−</b> volumen · <b>r</b> recargar · <b>s</b> mostrar sin señal · <b>Shift+H</b> ocultar · <b>c</b> categorías · <b>[ ] / RePág AvPág</b> categoría anterior/siguiente · <b>f/F11</b> pantalla completa ·
-    <b>?</b> ayuda · <b>q</b> salir
+  <div id="help" class="osd-glass" hidden>
+    <span><kbd>←↑→↓</kbd> <kbd>hjkl</kbd> mover foco</span> ·
+    <span><kbd>1–9</kbd> ir a canal</span> ·
+    <span><kbd>Enter</kbd> ampliar</span> ·
+    <span><kbd>m</kbd> silenciar</span> ·
+    <span><kbd>+</kbd> <kbd>−</kbd> volumen</span> ·
+    <span><kbd>r</kbd> recargar</span> ·
+    <span><kbd>s</kbd> mostrar sin señal</span> ·
+    <span><kbd>Shift+H</kbd> ocultar</span> ·
+    <span><kbd>c</kbd> categorías</span> ·
+    <span><kbd>[</kbd> <kbd>]</kbd> <kbd>RePág</kbd> <kbd>AvPág</kbd> categoría anterior/siguiente</span> ·
+    <span><kbd>f</kbd> <kbd>F11</kbd> pantalla completa</span> ·
+    <span><kbd>?</kbd> ayuda</span> ·
+    <span><kbd>q</kbd> salir</span>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.19/dist/hls.min.js"></script>
   <script src="app.js"></script>

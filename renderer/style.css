@@ -1,9 +1,61 @@
+/* Tokens del LiveTV Design System (claude.ai/design): tema oscuro, acento lima. */
+:root {
+  --ink-1000: #050608; --ink-950: #08090C; --ink-850: #14171E; --ink-700: #262B35;
+  --ink-500: #4A5160; --ink-300: #9098A8; --ink-200: #B8BECA; --ink-50: #F2F4F7; --white: #FFFFFF;
+  --lime-400: #CFF752; --lime-500: #C2F02E; --red-500: #FF3D3D;
+
+  --surface-1: #0E1015;
+  --surface-2: var(--ink-850);
+  --surface-raised: var(--ink-700);
+  --surface-glass: rgba(20, 23, 30, 0.72);
+  --surface-scrim: rgba(5, 6, 8, 0.64);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.24);
+  --text-primary: var(--ink-50);
+  --text-secondary: var(--ink-200);
+  --text-tertiary: var(--ink-300);
+  --text-disabled: var(--ink-500);
+  --text-on-accent: var(--ink-950);
+  --accent: var(--lime-500);
+  --accent-hover: var(--lime-400);
+  --focus-ring: var(--white);
+  --focus-glow: rgba(255, 255, 255, 0.18);
+  --danger: var(--red-500);
+  --progress-track: rgba(255, 255, 255, 0.18);
+
+  --font-display: 'Sora', 'Figtree', system-ui, sans-serif;
+  --font-ui: 'Figtree', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --tracking-tight: -0.025em;
+  --tracking-caps: 0.08em;
+  --text-h2: 600 40px/1.15 var(--font-display);
+  --text-body: 400 24px/1.4 var(--font-ui);
+  --text-label: 600 22px/1.2 var(--font-ui);
+  --text-caption: 500 20px/1.3 var(--font-ui);
+
+  --safe-x: 96px;
+  --safe-y: 54px;
+  --radius-xs: 6px; --radius-md: 14px; --radius-lg: 20px; --radius-xl: 28px; --radius-pill: 999px;
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 24px 64px rgba(0, 0, 0, 0.7);
+  --shadow-focus: 0 0 0 4px var(--focus-ring), 0 0 0 12px var(--focus-glow), var(--shadow-3);
+  --shadow-focus-inset: inset 0 0 0 4px var(--focus-ring);
+  --blur-glass: blur(28px) saturate(140%);
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --dur-base: 200ms;
+  --dur-slow: 360ms;
+
+  /* Los OSD están diseñados a 1920×1080; app.js fija --ui según la ventana. */
+  --ui: 1;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
   margin: 0;
   height: 100%;
-  background: #000;
+  background: var(--ink-1000);
   color: #eee;
   font: 14px system-ui, sans-serif;
   overflow: hidden;
@@ -22,20 +74,27 @@ html, body {
   min-width: 0;
   min-height: 0;
   border: 2px solid transparent;
-  background: #111;
+  background: var(--surface-1);
 }
 
-/* Borde de foco como capa propia: un outline/border del tile queda tapado por el iframe. */
+/* Anillo de foco como capa propia: un outline/border del tile queda tapado por
+   el iframe. Blanco con halo suave (design system); el halo se sale del tile
+   sobre los vecinos, por eso el tile enfocado va encima. */
 .tile .focus-ring {
   position: absolute;
   inset: 0;
   z-index: 2;
-  border: 6px solid transparent;
+  border: 4px solid transparent;
   pointer-events: none;
+  transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
-.tile.focused .focus-ring { border-color: #22c55e; }
-/* Ampliado solo hay un canal en pantalla: el borde de foco sobra. */
-#grid.zoomed .tile.focused .focus-ring { border-color: transparent; }
+.tile.focused { z-index: 1; }
+.tile.focused .focus-ring {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 8px var(--focus-glow), inset 0 0 24px rgba(0, 0, 0, 0.35);
+}
+/* Ampliado solo hay un canal en pantalla: el anillo de foco sobra. */
+#grid.zoomed .tile.focused .focus-ring { border-color: transparent; box-shadow: none; }
 
 /* Canal sin señal fuera del mosaico. Se saca del flujo de la grilla en vez de
    usar display: none para que el reproductor siga cargando y pueda volver. */
@@ -91,29 +150,20 @@ html, body {
   white-space: pre-wrap;
   text-align: center;
 }
+#help span { white-space: nowrap; }
 /* El display: grid de arriba anula [hidden]; sin esto la capa tapa los clics del mosaico. */
 #message[hidden] { display: none; }
 
-#help {
-  position: fixed;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  z-index: 20;
-  padding: 8px 14px;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.85);
-  white-space: nowrap;
-}
 
-/* Sin señal / sin canal: pantalla azul de VHS. */
+/* Sin señal / sin canal: superficie oscura con el nombre del canal arriba y,
+   al centro, un ícono de televisor apagado y el motivo. Los tamaños van en
+   unidades del contenedor para escalar con el tile. */
 .tile.nosignal {
-  background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 4px),
-    #0000aa;
-  font-family: 'VT323', 'DejaVu Sans Mono', monospace;
-  color: #fff;
-  text-shadow: 2px 0 rgba(255, 0, 80, 0.5), -2px 0 rgba(0, 220, 255, 0.5);
+  container-type: size;
+  background: var(--surface-1);
+  font-family: var(--font-ui);
+  color: var(--text-tertiary);
+  -webkit-font-smoothing: antialiased;
 }
 .tile.nosignal .player,
 .tile.nosignal iframe,
@@ -121,24 +171,32 @@ html, body {
 .tile.nosignal::before {
   content: attr(data-channel);
   position: absolute;
-  top: 6%;
-  right: 6%;
-  max-width: 88%;
+  top: 7cqh;
+  left: 5cqw;
+  right: 5cqw;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(16px, 4vmin, 48px);
+  font: 600 max(13px, min(8cqh, 5cqw))/1.15 var(--font-display);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-secondary);
 }
 .tile.nosignal::after {
   content: attr(data-nosignal);
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: clamp(18px, 5vmin, 64px);
-  letter-spacing: 0.1em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4cqh;
+  font: 500 max(12px, min(7cqh, 4cqw))/1.3 var(--font-ui);
+  /* Ícono "tv" de Lucide tachado, sobre el texto. */
+  padding-top: 18cqh;
+  background: no-repeat center calc(50% - 6cqh) / auto 16cqh
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234A5160' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='20' height='15' x='2' y='7' rx='2'/%3E%3Cpolyline points='17 2 12 7 7 2'/%3E%3Cpath d='m2 2 20 20'/%3E%3C/svg%3E");
 }
-.tile.nosignal .status { font-family: system-ui, sans-serif; text-shadow: none; }
+.tile.nosignal .status { font-family: system-ui, sans-serif; }
 
 /* Tile de Polymarket: probabilidades en verde fósforo sobre negro con scanlines.
    Los tamaños van en unidades del contenedor (cqh/cqw) para escalar con el tile,
@@ -214,174 +272,315 @@ html, body {
   opacity: 0.7;
 }
 
-/* OSD de volumen: verde fósforo, grande, sobre toda la ventana (estilo Sony Trinitron). */
-.osd {
+/* OSD: capas sobre el mosaico con el lenguaje del design system. Se diseñan
+   en px a 1920×1080 y se escalan con zoom según el tamaño de la ventana. */
+.osd,
+#help {
   position: fixed;
   z-index: 30;
+  zoom: var(--ui);
   pointer-events: none;
-  font-family: 'VT323', 'DejaVu Sans Mono', monospace;
-  color: #3cff3c;
-  text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 0 0 12px rgba(60, 255, 60, 0.6);
+  font: var(--text-body);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
 }
-.osd[hidden] { display: none; }
-#osd {
-  left: 6vw;
-  right: 6vw;
-  bottom: 10vh;
+/* Los display: flex/grid de cada OSD (con id, más específicos) anularían [hidden]. */
+.osd[hidden],
+#help[hidden] { display: none !important; }
+.osd-glass {
+  border-radius: var(--radius-lg);
+  background: var(--surface-glass);
+  backdrop-filter: var(--blur-glass);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-3);
+  animation: osd-in var(--dur-base) var(--ease-out);
+}
+@keyframes osd-in {
+  from { opacity: 0; transform: translateY(12px); }
 }
 
-/* OSD de canal: número grande y nombre debajo, esquina superior derecha. */
-#osd-channel {
-  top: 5vh;
-  right: 4vw;
-  max-width: 60vw;
+.icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6em;
+  height: 1.5em;
+  padding: 0 0.35em;
+  border-radius: var(--radius-xs);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border-default);
+  font: 600 0.85em/1 var(--font-mono);
+  color: var(--text-primary);
+  vertical-align: 0.05em;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-xs);
+  font: 700 18px/1 var(--font-ui);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.badge-glass {
+  background: var(--surface-glass);
+  color: var(--text-primary);
+  border: 1.5px solid var(--border-strong);
+}
+
+/* Volumen: toast abajo al centro con barra de progreso lima. */
+#osd {
+  left: 50%;
+  bottom: calc(var(--safe-y) + 24px);
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: 720px;
+  padding: 22px 32px;
+}
+#osd .osd-label { font: var(--text-label); font-size: 24px; min-width: 110px; }
+#osd .progress {
+  flex: 1;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--progress-track);
+  overflow: hidden;
+}
+#osd .progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--dur-base) var(--ease-out);
+}
+#osd .osd-value {
+  min-width: 48px;
   text-align: right;
-  line-height: 1;
+  font: 600 26px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.icon-off { display: none; }
+#osd.muted .icon-on { display: none; }
+#osd.muted .icon-off { display: inline; }
+#osd.muted .icon { color: var(--text-tertiary); }
+#osd.muted .progress-fill { background: var(--text-disabled); }
+
+/* Canal: tarjeta arriba a la derecha con número, nombre y categoría. */
+#osd-channel {
+  top: var(--safe-y);
+  right: var(--safe-x);
+  max-width: 960px;
+  padding: 24px 32px 28px;
+  text-align: right;
+}
+.osd-category {
+  margin-bottom: 10px;
+  font: var(--text-caption);
+  color: var(--text-tertiary);
+}
+.osd-category:empty { display: none; }
+.osd-channel-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
 }
 .osd-number {
-  font-size: clamp(56px, 14vh, 180px);
-  letter-spacing: 0.06em;
+  font: 600 32px/1 var(--font-mono);
+  color: var(--accent);
 }
+.osd-muted { display: none; }
+#osd-channel.muted .osd-muted { display: inline-flex; }
 .osd-name {
-  margin-top: 1vh;
-  font-size: clamp(24px, 5vh, 64px);
-  letter-spacing: 0.04em;
+  margin-top: 10px;
+  font: 700 56px/1.15 var(--font-display);
+  letter-spacing: var(--tracking-tight);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Categoría actual, sobre el número de canal (solo con más de una categoría). */
-.osd-category {
-  margin-bottom: 1vh;
-  font-size: clamp(20px, 4vh, 52px);
-  letter-spacing: 0.04em;
-}
-.osd-category:empty { display: none; }
-/* Menú de categorías (c): lista centrada, la elegida en video inverso. */
-#osd-menu {
+
+/* Diálogos (categorías, agregar canal, confirmar): panel sobre un scrim desenfocado. */
+.osd-scrim {
   inset: 0;
   display: grid;
-  place-content: center;
-  line-height: 1.1;
-  background: rgba(0, 0, 0, 0.7);
+  place-items: center;
+  background: var(--surface-scrim);
+  backdrop-filter: blur(12px);
+  animation: osd-fade var(--dur-base) var(--ease-out);
 }
-#osd-menu[hidden] { display: none; }
-.osd-menu-title {
-  font-size: clamp(40px, 9vh, 120px);
-  letter-spacing: 0.08em;
-  margin-bottom: 2vh;
+@keyframes osd-fade {
+  from { opacity: 0; }
 }
-.osd-menu-list {
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 760px;
+  max-width: 90%;
+  max-height: 90%;
+  padding: 48px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-3);
+  animation: osd-in var(--dur-slow) var(--ease-out);
+}
+.dialog h2 {
   margin: 0;
-  padding: 0;
+  font: var(--text-h2);
+  letter-spacing: var(--tracking-tight);
+}
+.dialog-body {
+  margin: 0;
+  color: var(--text-secondary);
+}
+.dialog-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+}
+.osd-keys {
+  margin-top: 8px;
+  font: var(--text-caption);
+  color: var(--text-tertiary);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 68px;
+  padding: 0 32px;
+  border-radius: var(--radius-pill);
+  font: 600 22px/1 var(--font-ui);
+  white-space: nowrap;
+}
+.button kbd { background: rgba(0, 0, 0, 0.12); border-color: transparent; color: inherit; }
+.button-primary { background: var(--accent); color: var(--text-on-accent); box-shadow: var(--shadow-focus); }
+.button-secondary { background: rgba(255, 255, 255, 0.12); color: var(--text-primary); }
+
+/* Confirmar ocultar. */
+#osd-confirm .dialog > .icon { width: 48px; height: 48px; color: var(--text-secondary); }
+
+/* Menú de categorías: filas tipo ListItem, la elegida con el anillo de foco. */
+.osd-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   list-style: none;
-  font-size: clamp(28px, 6vh, 80px);
-  letter-spacing: 0.04em;
+  /* Margen para que la fila elegida (escalada, con anillo) no se recorte. */
+  margin: -8px -16px;
+  padding: 8px 16px;
+  overflow: hidden auto;
 }
 .osd-menu-list li {
-  padding: 0 0.4em;
-  white-space: pre;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 72px;
+  padding: 12px 28px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font: var(--text-label);
+  font-size: 24px;
+  transition: transform var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
-.osd-menu-list li.current::after { content: ' ●'; }
+.osd-menu-key {
+  min-width: 24px;
+  font: 600 22px/1 var(--font-mono);
+  color: var(--text-tertiary);
+}
+.osd-menu-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.osd-menu-list li.current::after {
+  content: 'Actual';
+  font: var(--text-caption);
+  color: var(--accent);
+}
 .osd-menu-list li.selected {
-  color: #000;
-  background: #3cff3c;
-  text-shadow: none;
-  box-shadow: 0 0 14px rgba(60, 255, 60, 0.6);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-focus-inset), var(--shadow-2);
+  transform: scale(1.02);
 }
-.osd-menu-keys {
-  margin-top: 2vh;
-  font-size: clamp(20px, 4vh, 52px);
-  letter-spacing: 0.04em;
-}
+.osd-menu-list li.action { margin-top: 8px; color: var(--text-secondary); }
+.osd-menu-list li.action .osd-menu-key { color: var(--accent); font-size: 28px; }
+.osd-menu-list li.action.selected { color: var(--text-primary); }
 
-.osd-menu-list li.action { margin-top: 1vh; }
-/* Formulario "Agregar canal": campos en verde fósforo, el activo en video inverso. */
-#osd-add {
-  inset: 0;
-  display: grid;
-  place-content: center;
-  gap: 1.5vh;
-  background: rgba(0, 0, 0, 0.8);
-  /* Los .osd no reciben clics; este tapa el mosaico mientras está abierto. */
-  pointer-events: auto;
-}
-#osd-add[hidden] { display: none; }
+/* Agregar canal: campos de texto en píldora; el activo con anillo de foco. */
+#osd-add { pointer-events: auto; }
+#osd-add .dialog { width: 960px; }
 .osd-field {
-  display: grid;
-  grid-template-columns: 9em minmax(0, 1fr);
-  align-items: baseline;
-  gap: 0.6em;
-  width: min(80vw, 34em);
-  font-size: clamp(22px, 4.5vh, 56px);
-  letter-spacing: 0.04em;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   outline: none;
 }
-.osd-field input {
-  font: inherit;
-  color: inherit;
-  text-shadow: inherit;
-  background: rgba(60, 255, 60, 0.08);
-  border: 2px solid rgba(60, 255, 60, 0.4);
-  padding: 0 0.3em;
+.osd-field-label {
+  font: var(--text-caption);
+  color: var(--text-tertiary);
+}
+.osd-field input,
+.osd-select {
+  height: 72px;
+  padding: 0 32px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 2px var(--border-default);
+  color: var(--text-primary);
+  font: 500 26px/1 var(--font-ui);
+  caret-color: var(--accent);
   outline: none;
-  caret-color: #3cff3c;
+  transition: background var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
-.osd-field input::placeholder { color: rgba(60, 255, 60, 0.35); text-shadow: none; }
-.osd-field input:focus { border-color: #3cff3c; box-shadow: 0 0 12px rgba(60, 255, 60, 0.5); }
-.osd-field-category:focus .osd-add-category {
-  color: #000;
-  background: #3cff3c;
-  text-shadow: none;
+.osd-field input::placeholder { color: var(--text-disabled); }
+.osd-field input:focus,
+.osd-field-category:focus .osd-select {
+  background: var(--surface-raised);
+  box-shadow: 0 0 0 4px var(--focus-ring), 0 0 0 12px var(--focus-glow);
 }
-.osd-add-category { padding: 0 0.3em; }
+.osd-field:focus-within .osd-field-label,
+.osd-field-category:focus .osd-field-label { color: var(--text-primary); }
+.osd-select {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.osd-add-category { flex: 1; text-align: center; }
+.osd-chevron { font: 600 34px/1 var(--font-ui); color: var(--text-tertiary); }
+.osd-field-category:focus .osd-chevron { color: var(--accent); }
 .osd-add-error {
-  min-height: 1.1em;
-  font-size: clamp(20px, 4vh, 52px);
-  color: #ff4a3c;
-  text-shadow: 3px 3px 0 #000, 0 0 10px rgba(255, 74, 60, 0.5);
+  min-height: 26px;
+  font: var(--text-caption);
+  color: var(--danger);
 }
+.osd-add-error.busy { color: var(--text-secondary); }
 
-/* Confirmación de ocultar: centrada sobre todo el mosaico. */
-#osd-confirm {
-  inset: 0;
-  display: grid;
-  place-content: center;
+/* Ayuda (?): atajos de teclado abajo al centro. */
+#help {
+  left: 50%;
+  bottom: var(--safe-y);
+  translate: -50% 0;
+  width: max-content;
+  max-width: 1600px;
+  padding: 20px 28px;
+  font: var(--text-caption);
+  line-height: 2;
+  color: var(--text-secondary);
   text-align: center;
-  line-height: 1.1;
-  background: rgba(0, 0, 0, 0.5);
 }
-#osd-confirm[hidden] { display: none; }
-.osd-confirm-title {
-  font-size: clamp(48px, 12vh, 160px);
-  letter-spacing: 0.06em;
-}
-.osd-confirm-keys {
-  font-size: clamp(24px, 5vh, 64px);
-  letter-spacing: 0.04em;
-}
-
-#osd-channel.muted .osd-name::after { content: ' · MUTE'; }
-.osd-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: clamp(40px, 9vh, 120px);
-  line-height: 1;
-  letter-spacing: 0.08em;
-  margin-bottom: 2vh;
-}
-.osd-bar {
-  display: flex;
-  gap: 0.5vw;
-  height: clamp(30px, 8vh, 100px);
-}
-.osd-bar span {
-  flex: 1;
-  border: 2px solid #000;
-  background: rgba(60, 255, 60, 0.12);
-}
-.osd-bar span.on {
-  background: #3cff3c;
-  box-shadow: 0 0 10px rgba(60, 255, 60, 0.7);
-}
+#help span { white-space: nowrap; }

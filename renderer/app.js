@@ -4,7 +4,6 @@ const LIVES_POLL_MS = 120000;
 const CHANNEL_OSD_MS = 3000;
 const CONFIRM_MS = 5000;
 const VOLUME_STEP = 5;
-const OSD_SEGMENTS = 50;
 const OSD_MS = 2500;
 const ZOOM_MS = 900;
 // Se aplica a la animación entera; los keyframes intermedios van en línea recta.
@@ -34,7 +33,7 @@ const osd = {
   el: document.getElementById('osd'),
   label: document.querySelector('#osd .osd-label'),
   value: document.querySelector('#osd .osd-value'),
-  bar: document.querySelector('#osd .osd-bar'),
+  fill: document.querySelector('#osd .progress-fill'),
   timer: null,
 };
 const channelOsd = {
@@ -199,7 +198,7 @@ function setStatus(tile, text) {
   tile.statusEl.textContent = text;
 }
 
-// Pantalla azul tipo VHS para canales sin señal o sin configurar.
+// Pantalla de sin señal para canales caídos o sin configurar.
 function setNoSignal(tile, text) {
   tile.el.classList.toggle('nosignal', !!text);
   if (text) {
@@ -209,7 +208,7 @@ function setNoSignal(tile, text) {
 }
 
 // Un canal sin señal sale del mosaico hasta que vuelva a reproducir. No basta
-// con la pantalla azul: cada reintento la quita mientras carga y la grilla
+// con la pantalla de sin señal: cada reintento la quita mientras carga y la grilla
 // saltaría cada 30 s.
 function setOffline(tile, offline) {
   if (tile.offline === offline) return;
@@ -217,7 +216,7 @@ function setOffline(tile, offline) {
   if (tiles.includes(tile)) layout();
 }
 
-// OSD verde de canal en la esquina superior derecha de la ventana.
+// OSD de canal en la esquina superior derecha de la ventana.
 function showChannelOsd(tile) {
   channelOsd.number.textContent = tile.number;
   channelOsd.name.textContent = tile.name;
@@ -290,14 +289,14 @@ function createPlayer(tile) {
     return;
   }
   if (!stream.url && !stream.channel) {
-    setNoSignal(tile, 'SIN CANAL');
+    setNoSignal(tile, 'Sin canal');
     setStatus(tile, '');
     return;
   }
   // El live de un tile de canal lo asigna syncLives().
   const videoId = stream.channel ? tile.videoId : parseVideoId(stream.url || '');
   if (!videoId) {
-    setNoSignal(tile, 'SIN SEÑAL');
+    setNoSignal(tile, 'Sin señal');
     setStatus(tile, stream.channel ? 'Sin live, reintentando…' : `URL inválida: ${stream.url}`);
     return;
   }
@@ -320,7 +319,7 @@ function createPlayer(tile) {
     },
     onStateChange: (e) => onStateChange(tile, e.data),
     onError: (e) => {
-      setNoSignal(tile, 'SIN SEÑAL');
+      setNoSignal(tile, 'Sin señal');
       setStatus(tile, `Error ${e.data}`);
       // Un canal sin live activo puede volver a transmitir: reintentar.
       if (stream.channel) markFailed(tile);
@@ -348,7 +347,7 @@ function createVideo(tile) {
   const alive = () => tile.player === player && video.isConnected;
   const fail = (text) => {
     if (!alive()) return;
-    setNoSignal(tile, 'SIN SEÑAL');
+    setNoSignal(tile, 'Sin señal');
     setStatus(tile, text);
     clearTimeout(tile.retryTimer);
     tile.retryTimer = setTimeout(() => createPlayer(tile), ENDED_RETRY_MS);
@@ -440,7 +439,7 @@ function syncLives(group) {
       if (group.sync !== sync) return;
       console.warn(`No se pudo buscar el live de ${group.stream.channel}:`, err);
       if (!primary.player && !primary.hidden) {
-        setNoSignal(primary, 'SIN SEÑAL');
+        setNoSignal(primary, 'Sin señal');
         setStatus(primary, 'Reintentando…');
       }
     })
@@ -456,7 +455,7 @@ function syncLives(group) {
 function createWindy(tile) {
   const src = windyEmbedUrl(tile.stream.windy);
   if (!src) {
-    setNoSignal(tile, 'SIN SEÑAL');
+    setNoSignal(tile, 'Sin señal');
     setStatus(tile, `URL inválida: ${tile.stream.windy}`);
     return;
   }
@@ -501,7 +500,7 @@ function loadMarket(tile, market) {
       console.warn(`No se pudo leer el mercado ${stream.polymarket}:`, err);
       // Con datos ya en pantalla se siguen mostrando; el WebSocket sigue vivo.
       if (!market.loaded) {
-        setNoSignal(tile, 'SIN SEÑAL');
+        setNoSignal(tile, 'Sin señal');
         setStatus(tile, 'Reintentando…');
       }
       market.timer = setTimeout(() => loadMarket(tile, market), ENDED_RETRY_MS);
@@ -670,7 +669,7 @@ function onStateChange(tile, state) {
       tile.player.playVideo();
       break;
     case YT.PlayerState.ENDED:
-      setNoSignal(tile, 'SIN SEÑAL');
+      setNoSignal(tile, 'Sin señal');
       setStatus(tile, 'Reintentando…');
       if (tile.stream.channel) markFailed(tile);
       else tile.retryTimer = setTimeout(() => createPlayer(tile), ENDED_RETRY_MS);
@@ -763,7 +762,7 @@ function askHide(tile) {
   // No se oculta el último stream: el mosaico quedaría vacío.
   if (tiles.filter((t) => !t.hidden).length <= 1) return;
   pendingHide = tile;
-  confirmOsd.title.textContent = `¿OCULTAR ${tile.number}?`;
+  confirmOsd.title.textContent = `¿Ocultar ${tile.name}?`;
   confirmOsd.el.hidden = false;
   clearTimeout(confirmOsd.timer);
   confirmOsd.timer = setTimeout(() => closeConfirm(), CONFIRM_MS);
@@ -857,12 +856,21 @@ function closeMenu() {
 }
 
 function renderMenu() {
-  const add = document.createElement('li');
-  add.className = 'action';
-  add.textContent = '+ AGREGAR CANAL';
-  menu.list.replaceChildren(...categories.map((category, k) => {
+  const item = (key, name) => {
     const li = document.createElement('li');
-    li.textContent = `${k < 9 ? k + 1 : ' '} ${category.name}`;
+    const keyEl = document.createElement('span');
+    const nameEl = document.createElement('span');
+    keyEl.className = 'osd-menu-key';
+    keyEl.textContent = key;
+    nameEl.className = 'osd-menu-name';
+    nameEl.textContent = name;
+    li.append(keyEl, nameEl);
+    return li;
+  };
+  const add = item('+', 'Agregar canal');
+  add.className = 'action';
+  menu.list.replaceChildren(...categories.map((category, k) => {
+    const li = item(k < 9 ? String(k + 1) : '', category.name);
     li.classList.toggle('current', k === categoryIndex);
     return li;
   }), add);
@@ -917,7 +925,7 @@ function closeAddForm() {
 }
 
 function renderAddCategory() {
-  addForm.categoryName.textContent = `◀ ${categories[addForm.index].name} ▶`;
+  addForm.categoryName.textContent = categories[addForm.index].name;
 }
 
 // Las teclas que no son del formulario quedan para los campos de texto.
@@ -948,18 +956,19 @@ async function saveAddForm() {
   if (addForm.saving) return;
   const parsed = parseStreamInput(addForm.source.value);
   if (!parsed) {
-    addForm.error.textContent = 'NO SE RECONOCE EL CANAL';
+    addForm.error.textContent = 'No se reconoce el canal';
     return;
   }
   const category = categories[addForm.index];
   const key = streamKey(parsed);
   if (category.streams.some((s) => streamKey(s) === key)) {
-    addForm.error.textContent = `YA ESTÁ EN ${category.name.toUpperCase()}`;
+    addForm.error.textContent = `Ya está en ${category.name}`;
     return;
   }
   const name = addForm.name.value.trim();
   addForm.saving = true;
-  addForm.error.textContent = 'GUARDANDO…';
+  addForm.error.textContent = 'Guardando…';
+  addForm.error.classList.add('busy');
   let stream;
   try {
     stream = await window.livetv.addStream({
@@ -968,10 +977,11 @@ async function saveAddForm() {
       stream: name ? { name, ...parsed } : parsed,
     });
   } catch (err) {
-    addForm.error.textContent = err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '').toUpperCase();
+    addForm.error.textContent = err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
     return;
   } finally {
     addForm.saving = false;
+    addForm.error.classList.remove('busy');
   }
   addForm.error.textContent = '';
   closeAddForm();
@@ -1009,7 +1019,7 @@ function layout() {
     const el = document.createElement('div');
     el.className = 'tile nosignal empty';
     el.dataset.channel = `CH ${String(groups.length + k - n + 1).padStart(2, '0')}`;
-    el.dataset.nosignal = 'SIN CANAL';
+    el.dataset.nosignal = 'Sin canal';
     grid.append(el);
   }
 
@@ -1192,19 +1202,22 @@ function changeVolume(delta) {
   showVolumeOsd();
 }
 
-// OSD verde de pantalla completa al estilo de los televisores Sony antiguos.
+// OSD de volumen abajo al centro. El volumen es global, como un televisor.
 function showVolumeOsd() {
-  const lit = Math.round((volume / 100) * OSD_SEGMENTS);
-  osd.label.textContent = muted ? 'MUTE' : 'VOLUMEN';
-  osd.value.textContent = muted ? '' : String(volume);
-  osd.bar.replaceChildren(...Array.from({ length: OSD_SEGMENTS }, (_, k) => {
-    const seg = document.createElement('span');
-    if (k < lit && !muted) seg.className = 'on';
-    return seg;
-  }));
+  osd.el.classList.toggle('muted', muted);
+  osd.label.textContent = muted ? 'MUTE' : 'Volumen';
+  osd.value.textContent = String(volume);
+  osd.fill.style.width = `${volume}%`;
   osd.el.hidden = false;
   clearTimeout(osd.timer);
   osd.timer = setTimeout(() => { osd.el.hidden = true; }, OSD_MS);
+}
+
+// Los OSD están diseñados a 1920×1080 (como el design system); --ui los
+// escala con zoom al tamaño de la ventana.
+function scaleOsd() {
+  const ui = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  document.documentElement.style.setProperty('--ui', String(ui));
 }
 
 function showMessage(text) {
@@ -1215,6 +1228,8 @@ function showMessage(text) {
 
 async function main() {
   document.addEventListener('keydown', onKey);
+  scaleOsd();
+  window.addEventListener('resize', scaleOsd);
   // Si un iframe llegara a tomar el foco, devolverlo al documento.
   window.addEventListener('blur', () => setTimeout(() => {
     if (document.activeElement?.tagName === 'IFRAME') document.activeElement.blur();
