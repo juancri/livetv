@@ -174,7 +174,8 @@ body.idle * { cursor: none !important; }
 }
 .tile.nosignal .player,
 .tile.nosignal iframe,
-.tile.nosignal .market { visibility: hidden; }
+.tile.nosignal .market,
+.tile.nosignal .radio-screen { visibility: hidden; }
 .tile.nosignal::before {
   content: attr(data-channel);
   position: absolute;
@@ -204,6 +205,93 @@ body.idle * { cursor: none !important; }
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234A5160' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='20' height='15' x='2' y='7' rx='2'/%3E%3Cpolyline points='17 2 12 7 7 2'/%3E%3Cpath d='m2 2 20 20'/%3E%3C/svg%3E");
 }
 .tile.nosignal .status { font-family: system-ui, sans-serif; }
+
+/* Radio (setRadio): un stream sin video muestra de fondo el logo agrandado,
+   desenfocado y oscurecido, al centro el logo, el nombre y un badge, y abajo
+   un espectro flotante, separado de los bordes. En unidades del contenedor para escalar con el tile. */
+.tile.radio .player { visibility: hidden; }
+/* El tile es el contenedor: así el gap y el padding de .radio-screen también
+   escalan con él (las unidades cq de un elemento miran a su ancestro). */
+.tile.radio { container-type: size; }
+.radio-screen {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3cqh;
+  padding-bottom: 26cqh;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, var(--surface-raised), var(--surface-1) 70%);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+.radio-backdrop {
+  position: absolute;
+  inset: -10%;
+  background: center / cover no-repeat;
+  filter: blur(6cqh) saturate(1.4) brightness(0.45);
+}
+.radio-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, rgba(0, 0, 0, 0.6));
+}
+.radio-logo,
+.radio-name,
+.radio-badge,
+.radio-bars { position: relative; }
+.radio-logo {
+  display: grid;
+  place-items: center;
+  width: 30cqh;
+  height: 30cqh;
+  flex: none;
+  border-radius: 4cqh;
+  background: var(--surface-2);
+  box-shadow: 0 2cqh 6cqh rgba(0, 0, 0, 0.5);
+  font: 800 9cqh/1 var(--font-display);
+  color: var(--text-secondary);
+  overflow: hidden;
+}
+/* Absoluta: en una grilla, height: 100% no se aplica y un logo cuadrado
+   en la placa apaisada se cortaría. */
+.radio-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.radio-logo.plate { width: 48cqh; background: var(--white); }
+.radio-logo.plate img { object-fit: contain; padding: 8%; }
+.radio-name {
+  max-width: 90cqw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 max(13px, min(8cqh, 5cqw))/1.15 var(--font-display);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-primary);
+  text-shadow: 0 0.5cqh 2cqh rgba(0, 0, 0, 0.6);
+}
+.badge.radio-badge { height: auto; padding: 0.45em 0.8em; font-size: max(10px, 4cqh); }
+.radio-bars {
+  position: absolute;
+  left: 8cqw;
+  right: 8cqw;
+  bottom: 7cqh;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6cqw;
+  height: 18cqh;
+}
+.radio-bars span {
+  flex: 1;
+  height: 100%;
+  border-radius: 1cqh;
+  background: linear-gradient(to top, var(--accent), rgba(255, 255, 255, 0.85));
+  opacity: 0.85;
+  transform: scaleY(0.04);
+  transform-origin: bottom;
+}
 
 /* Tile de Polymarket: título, una fila por resultado (nombre, probabilidad,
    variación del día, barra y sparkline) y un pie con el badge EN VIVO.

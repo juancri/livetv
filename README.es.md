@@ -2,7 +2,7 @@
 
 [English](README.md) · **Español**
 
-Mosaico de canales en vivo (Electron): lives de YouTube, streams HLS (`.m3u8`), mercados de Polymarket y mapas de Windy, con guía de programación. Se maneja con el teclado como un televisor; solo el tile con foco (anillo blanco) tiene audio.
+Mosaico de canales en vivo (Electron): lives de YouTube, streams HLS (`.m3u8`), radios, mercados de Polymarket y mapas de Windy, con guía de programación. Se maneja con el teclado como un televisor; solo el tile con foco (anillo blanco) tiene audio.
 
 ![Mosaico de canales](docs/screenshots/mosaico.jpg)
 
@@ -40,11 +40,11 @@ La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `
 }
 ```
 
-Desde el menú de categorías (`c`, y luego **Agregar canal** o `a`) se puede **agregar un canal** sin editar el archivo: se escribe un handle (`@canal`), una URL de canal o video de YouTube, una URL `.m3u8`, la de un evento de Polymarket o la de un mapa de windy.com, un nombre opcional (si queda vacío se usa el título de YouTube o Polymarket) y la categoría (←→); ↑↓ o Tab cambian de campo, Enter guarda y Esc cancela. Se guarda al final de esa categoría en el archivo de config (que se reescribe con formato JSON estándar) y se abre en el acto.
+Desde el menú de categorías (`c`, y luego **Agregar canal** o `a`) se puede **agregar un canal** sin editar el archivo: se escribe un handle (`@canal`), una URL de canal o video de YouTube, la de un stream (`.m3u8`, una radio…), la de un evento de Polymarket o la de un mapa de windy.com, un nombre opcional (si queda vacío se usa el título de YouTube o Polymarket) y la categoría (←→); ↑↓ o Tab cambian de campo, Enter guarda y Esc cancela. Se guarda al final de esa categoría en el archivo de config (que se reescribe con formato JSON estándar) y se abre en el acto.
 
 El mosaico muestra una categoría a la vez (al empezar, la primera); al cambiar se cierran los streams de la anterior. Un mismo canal puede repetirse en varias categorías. En vez de `categories` se puede usar directamente una lista `"streams": [...]`, que queda como una sola categoría.
 
-- `url`: `watch?v=`, `youtu.be/`, `/live/`, `/embed/` o el ID de 11 caracteres. También acepta un stream HLS directo (URL `.m3u8`), que se reproduce con hls.js; si termina o falla se reintenta cada 30 s.
+- `url`: `watch?v=`, `youtu.be/`, `/live/`, `/embed/` o el ID de 11 caracteres. Cualquier otra URL se reproduce como stream: HLS (`.m3u8`, con hls.js) o directo (una radio Icecast, un MP3…); si termina o falla se reintenta cada 30 s. Un stream **solo de audio** se muestra como **radio**: el logo del canal de fondo, desenfocado, y al centro, con el nombre y un espectro que se mueve con el audio cuando suena. Ejemplo: `{ "name": "3ABN Radio", "url": "https://3abn.streamguys1.com/abr/english/playlist.m3u8", "epg": "3abn/radio" }`.
 - `channel`: ID del canal (`UC…`), handle (`@nombre`) o URL del canal; sigue automáticamente el live actual. Si el canal transmite varios lives a la vez, cada uno ocupa su propio tile (`CH 07`, `CH 07-2`, …), que se cierra cuando ese live termina. Los lives nuevos se detectan cada 2 minutos.
 - `max`: opcional, con `channel`; tope de tiles (lives simultáneos) para ese canal.
 - `epg`: opcional; de dónde sacar la programación del canal para la guía:

@@ -2,7 +2,9 @@
 // Audio para que los canales fuertes y los suaves suenen parecido. Se carga en
 // el renderer (videos HLS) y main.js lo inyecta en cada iframe de YouTube, que
 // es de otro origen y no se puede tocar desde la página.
-// window.livetvLeveler(on) lo enciende o apaga.
+// window.livetvLeveler(on) lo enciende o apaga. window.livetvAnalyser(video)
+// devuelve un AnalyserNode que escucha el audio del video (para las barras de
+// las radios), conectado en paralelo: no cambia lo que suena.
 (() => {
   if (window.livetvLeveler) return;
   let ctx = null;
@@ -28,9 +30,10 @@
     return video.livetvLeveler;
   }
 
-  function route({ source, compressor }) {
+  function route({ source, compressor, analyser }) {
     source.disconnect();
     compressor.disconnect();
+    if (analyser) source.connect(analyser);
     if (enabled) {
       source.connect(compressor);
       compressor.connect(ctx.destination);
@@ -51,6 +54,18 @@
   document.addEventListener('play', (e) => {
     if (e.target instanceof HTMLVideoElement) apply(e.target);
   }, true);
+
+  window.livetvAnalyser = (video) => {
+    const nodes = wire(video);
+    if (!nodes.analyser) {
+      nodes.analyser = ctx.createAnalyser();
+      nodes.analyser.fftSize = 256;
+      nodes.analyser.smoothingTimeConstant = 0.75;
+      route(nodes);
+      ctx.resume();
+    }
+    return nodes.analyser;
+  };
 
   window.livetvLeveler = (on) => {
     enabled = on;

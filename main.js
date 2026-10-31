@@ -55,6 +55,37 @@ async function fetchPage(url) {
   return res.text();
 }
 
+// URL final de un stream directo tras sus redirecciones. El <video> las sigue
+// solo, pero si cambian de origen Chromium deja el audio fuera de Web Audio
+// (llega en silencio al nivelador), así que el renderer reproduce la final. Se
+// pide sin bajar el cuerpo (se corta al llegar la respuesta); muchas URLs
+// finales llevan un token que vence en segundos, por eso se resuelve cada vez
+// que se abre el stream. net.request y no net.fetch: con redirect 'manual',
+// net.fetch falla en vez de entregar el 3xx.
+function resolveMedia(url) {
+  return new Promise((resolve, reject) => {
+    let current = url;
+    let hops = 0;
+    const req = net.request({ url, redirect: 'manual' });
+    req.setHeader('User-Agent', app.userAgentFallback);
+    req.on('redirect', (_status, _method, location) => {
+      current = location;
+      if (++hops > 5) {
+        req.abort();
+        resolve(current);
+      } else {
+        req.followRedirect();
+      }
+    });
+    req.on('response', () => {
+      req.abort();
+      resolve(current);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 // embed/live_stream?channel= da Error 150 aunque el live sí sea embebible,
 // así que se busca el video del live: <canal>/live lo tiene como canonical.
 // Es el live principal; si el canal transmite varios a la vez, el resto sale
@@ -365,13 +396,15 @@ function startServer() {
 }
 
 // hls.js baja la playlist y los segmentos de un .m3u8 con XHR desde el origin
-// local, y muchos servidores HLS no mandan Access-Control-Allow-Origin. Se
-// agrega a las respuestas pedidas por el renderer (no por los iframes de YouTube).
-function allowHlsCors(origin) {
+// local, y un stream directo (radio Icecast, MP3…) se pide como media con
+// crossOrigin para que su audio pase por Web Audio. Muchos servidores no mandan
+// Access-Control-Allow-Origin: se agrega a esas respuestas cuando las pide el
+// renderer (no los iframes de YouTube).
+function allowMediaCors(origin) {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const headers = details.responseHeaders || {};
     const hasCors = Object.keys(headers).some((h) => h.toLowerCase() === 'access-control-allow-origin');
-    if (details.resourceType !== 'xhr' || hasCors || !details.frame?.url.startsWith(origin)) {
+    if (!['xhr', 'media'].includes(details.resourceType) || hasCors || !details.frame?.url.startsWith(origin)) {
       callback({});
       return;
     }
@@ -381,7 +414,7 @@ function allowHlsCors(origin) {
 
 async function createWindow() {
   const port = await startServer();
-  allowHlsCors(`http://127.0.0.1:${port}/`);
+  allowMediaCors(`http://127.0.0.1:${port}/`);
   const win = new BrowserWindow({
     width: 1600,
     height: 900,
@@ -416,6 +449,7 @@ ipcMain.handle('price-history', (_e, tokenId) => priceHistory(tokenId));
 ipcMain.handle('add-stream', (_e, args) => addStream(args));
 ipcMain.handle('find-schedule', (_e, epg) => findSchedule(epg));
 ipcMain.handle('find-logo', (_e, stream) => findLogo(stream));
+ipcMain.handle('resolve-media', (_e, url) => resolveMedia(url));
 ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('set-settings', (e, changes) => saveSettings(BrowserWindow.fromWebContents(e.sender), changes));
 ipcMain.on('toggle-fullscreen', (e) => {

@@ -186,6 +186,17 @@ function parseVideoId(url) {
 }
 
 // Stream HLS directo (.m3u8), reproducido con un <video> en vez de YouTube.
+// Un `url` que no es de YouTube es un stream de medios: HLS (.m3u8) o directo
+// (Icecast, MP3, AAC…). Si no trae video, el tile se muestra como radio.
+function isMediaUrl(url) {
+  try {
+    const u = new URL(url);
+    return /^https?:$/.test(u.protocol) && !/(^|\.)(youtube\.com|youtu\.be)$/.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function isHls(url) {
   try {
     return new URL(url).pathname.toLowerCase().endsWith('.m3u8');
@@ -257,7 +268,7 @@ function parseStreamInput(text) {
   }
   if (/(^|\.)polymarket\.com$/.test(u.hostname) && u.pathname.startsWith('/event/')) return { polymarket: value };
   if (windyEmbedUrl(value)) return { windy: value };
-  if (isHls(value)) return { url: value };
+  if (isMediaUrl(value)) return { url: value };
   if (/(^|\.)(youtube\.com|youtu\.be)$/.test(u.hostname)) {
     if (parseVideoId(value)) return { url: value };
     if (/^\/(@[^/]+|channel\/UC[\w-]{22}|c\/[^/]+|user\/[^/]+)/.test(u.pathname)) return { channel: value };
@@ -391,7 +402,7 @@ function createPlayer(tile) {
     createWindy(tile);
     return;
   }
-  if (stream.url && isHls(stream.url)) {
+  if (stream.url && isMediaUrl(stream.url)) {
     createVideo(tile);
     return;
   }
@@ -467,6 +478,7 @@ function createVideo(tile) {
       if (hls) hls.destroy();
       video.removeAttribute('src');
       video.load();
+      setRadio(tile, null);
     },
   };
   tile.player = player;
@@ -478,6 +490,10 @@ function createVideo(tile) {
     setOffline(tile, false);
   });
   video.addEventListener('waiting', () => setStatus(tile, 'Buffering…'));
+  // Sin pista de video (videoWidth 0) es una radio.
+  video.addEventListener('loadedmetadata', () => {
+    if (alive()) setRadio(tile, video.videoWidth ? null : video);
+  });
   // Sin controles, una pausa nunca es intencional: retomar.
   video.addEventListener('pause', () => {
     if (alive() && !video.ended) video.play().catch(() => {});
@@ -486,7 +502,20 @@ function createVideo(tile) {
   video.addEventListener('error', () => fail(`Error ${video.error?.code ?? ''}`.trim()));
 
   const url = tile.stream.url;
-  if (window.Hls?.isSupported()) {
+  if (!isHls(url)) {
+    // Directo (Icecast, MP3…): con crossOrigin el audio puede pasar por Web
+    // Audio (nivelador y barras); main.js agrega el CORS si el servidor no lo
+    // manda y resuelve antes las redirecciones (una a otro origen lo dejaría
+    // fuera de Web Audio, en silencio).
+    video.crossOrigin = 'anonymous';
+    window.livetv.resolveMedia(url).catch(() => url).then((final) => {
+      if (!alive()) return;
+      video.src = final;
+      video.play().catch(() => {});
+    });
+    applyAudio();
+    return;
+  } else if (window.Hls?.isSupported()) {
     hls = new Hls();
     let recovered = false;
     hls.on(Hls.Events.ERROR, (_e, data) => {
@@ -509,6 +538,74 @@ function createVideo(tile) {
   }
   video.play().catch(() => {});
   applyAudio();
+}
+
+// Pantalla de radio: un stream sin video muestra de fondo el logo agrandado y
+// desenfocado, al centro el logo (o las iniciales), el nombre y un badge, y abajo
+// un espectro que sigue el audio (livetvAnalyser en leveler.js). Un video silenciado entrega silencio al analizador, así que
+// solo se mueve el del tile que suena; el resto queda en reposo.
+// setRadio(tile, null) la quita.
+const RADIO_BARS = 32;
+const radioTiles = new Set();
+let radioFrame = null;
+
+function setRadio(tile, video) {
+  tile.radio?.el.remove();
+  tile.radio = null;
+  radioTiles.delete(tile);
+  tile.el.classList.toggle('radio', !!video);
+  if (!video) return;
+  const el = document.createElement('div');
+  el.className = 'radio-screen';
+  const backdrop = document.createElement('div');
+  backdrop.className = 'radio-backdrop';
+  const logo = document.createElement('div');
+  logo.className = 'radio-logo';
+  const name = document.createElement('div');
+  name.className = 'radio-name';
+  name.textContent = tile.name;
+  const badge = document.createElement('span');
+  badge.className = 'badge badge-glass radio-badge';
+  badge.textContent = 'Radio';
+  const bars = document.createElement('div');
+  bars.className = 'radio-bars';
+  for (let k = 0; k < RADIO_BARS; k++) bars.append(document.createElement('span'));
+  el.append(backdrop, logo, name, badge, bars);
+  tile.playerHost.append(el);
+  let analyser = null;
+  try {
+    analyser = window.livetvAnalyser(video);
+  } catch {}
+  tile.radio = { el, backdrop, logo, video, analyser, bars: [...bars.children], data: analyser && new Uint8Array(analyser.frequencyBinCount) };
+  renderRadioLogo(tile);
+  radioTiles.add(tile);
+  if (!radioFrame) radioFrame = requestAnimationFrame(drawRadios);
+}
+
+// Logo al centro y de fondo; se llama de nuevo cuando llega el logo.
+function renderRadioLogo(tile) {
+  const { radio } = tile;
+  renderLogo(radio.logo, tile.stream, tile.group.name.slice(0, 3));
+  const url = logos.get(streamKey(tile.stream))?.url;
+  radio.backdrop.style.backgroundImage = url ? `url("${url}")` : '';
+}
+
+function drawRadios() {
+  radioFrame = radioTiles.size ? requestAnimationFrame(drawRadios) : null;
+  for (const { radio } of radioTiles) {
+    const live = radio.analyser && !radio.video.muted && !radio.video.paused;
+    if (live) radio.analyser.getByteFrequencyData(radio.data);
+    // Bandas sobre los primeros 3/5 del espectro: más arriba casi no hay señal
+    // (los streams de radio cortan sobre ~13 kHz).
+    const band = Math.max(1, Math.floor((radio.data?.length || 0) * 0.6 / RADIO_BARS));
+    radio.bars.forEach((bar, k) => {
+      let level = 0;
+      if (live) {
+        for (let i = k * band; i < (k + 1) * band; i++) level = Math.max(level, radio.data[i]);
+      }
+      bar.style.transform = `scaleY(${Math.max(0.04, level / 255)})`;
+    });
+  }
 }
 
 // El live del tile terminó o falló: syncLives() lo reintenta, le asigna otro
@@ -924,6 +1021,9 @@ function loadLogo(stream) {
         renderLogo(channelOsd.logo, stream, channelOsd.tile.group.name.slice(0, 3));
       }
       if (guideRow !== null) renderGuide();
+      for (const tile of radioTiles) {
+        if (tile.stream === stream) renderRadioLogo(tile);
+      }
     })
     .catch(() => {})
     .finally(() => logoRequests.delete(key));
