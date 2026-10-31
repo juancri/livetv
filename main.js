@@ -144,65 +144,12 @@ const decodeEntities = (s) => s
   .replace(/&#x([\da-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
   .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 
-// Programación de un canal para la guía, desde mi.tv (stream.epg =
-// "mi.tv/<país>/<canal>", el país y el id como en las URLs de mi.tv). La
-// página de cada día trae los programas en orden con la hora de inicio en UTC;
-// si la hora retrocede, ya es el día siguiente. Se piden ayer, hoy y mañana
-// (UTC) para tener lo que está al aire y lo que viene; cada programa dura hasta
-// que empieza el siguiente. Devuelve { logo, programs: [{ start, stop, title,
-// category, description }] } con tiempos en ms.
-const SCHEDULE_TTL_MS = 30 * 60 * 1000;
-const DAY_MS = 24 * 60 * 60 * 1000;
-const scheduleCache = new Map();
-
-async function findSchedule(epg) {
-  const m = /^mi\.tv\/([a-z]{2})\/([\w-]+)$/.exec(epg || '');
-  if (!m) throw new Error(`epg no reconocido: ${epg}`);
-  const cached = scheduleCache.get(epg);
-  if (cached && Date.now() - cached.at < SCHEDULE_TTL_MS) return cached.data;
-  const [, country, id] = m;
-  const today = Math.floor(Date.now() / DAY_MS) * DAY_MS;
-  const pages = await Promise.all([-1, 0, 1].map(async (k) => {
-    const day = today + k * DAY_MS;
-    const date = new Date(day).toISOString().slice(0, 10);
-    try {
-      return { day, html: await fetchPage(`https://mi.tv/${country}/async/channel/${id}/${date}/0`) };
-    } catch {
-      return null;
-    }
-  }));
-  const text = (html) => decodeEntities((html || '').replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
-  let logo = null;
-  // Las páginas se solapan (lo de pasada la medianoche sale en dos días): por inicio.
-  const byStart = new Map();
-  for (const page of pages.filter(Boolean)) {
-    logo ||= /<div class="channel-info">\s*<img src="([^"]+)"/.exec(page.html)?.[1] || null;
-    let base = page.day;
-    let prev = -Infinity;
-    for (const [, item] of page.html.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/g)) {
-      const time = /class="time">\s*(\d{1,2}):(\d{2})/.exec(item);
-      if (!time) continue;
-      let start = base + (Number(time[1]) * 60 + Number(time[2])) * 60000;
-      if (start < prev) {
-        base += DAY_MS;
-        start += DAY_MS;
-      }
-      prev = start;
-      byStart.set(start, {
-        start,
-        title: text(/<h2>([\s\S]*?)<\/h2>/.exec(item)?.[1]),
-        category: text(/class="sub-title">([\s\S]*?)<\/span>/.exec(item)?.[1]),
-        description: text(/class="synopsis">([\s\S]*?)<\/p>/.exec(item)?.[1]),
-      });
-    }
-  }
-  const programs = [...byStart.values()].sort((a, b) => a.start - b.start);
-  programs.forEach((p, k) => { p.stop = programs[k + 1]?.start ?? p.start + 60 * 60000; });
-  if (!programs.length) throw new Error(`mi.tv no trajo programación para ${epg}`);
-  const data = { logo, programs };
-  scheduleCache.set(epg, { at: Date.now(), data });
-  return data;
-}
+// Programación para la guía según stream.epg: ver epg/index.js.
+const findSchedule = require('./epg')({
+  cacheDir: path.join(__dirname, 'cache', 'schedules'),
+  fetchPage,
+  decodeEntities,
+});
 
 // Logo de un canal para el OSD de canal y la guía: el `logo` de la config (una
 // URL, sobre placa como los de mi.tv), el de mi.tv si el stream tiene epg

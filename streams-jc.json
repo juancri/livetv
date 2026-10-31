@@ -192,7 +192,8 @@
       "streams": [
         {
           "name": "Nuevo Tiempo",
-          "channel": "@nuevotiempotv"
+          "channel": "@nuevotiempotv",
+          "epg": "mi.tv/cl/nuevo-tiempo"
         },
         {
           "name": "Novo Tempo",
@@ -209,42 +210,50 @@
         {
           "name": "3ABN",
           "url": "https://3abn.bozztv.com/3abn2/3abn_live/smil:3abn_live.smil/playlist.m3u8",
-          "logo": "https://alpha.uscreencdn.com/images/programs/526675/horizontal/3ABN--1480x840.1659535621.jpg"
+          "logo": "https://alpha.uscreencdn.com/images/programs/526675/horizontal/3ABN--1480x840.1659535621.jpg",
+          "epg": "3abn/main"
         },
         {
           "name": "3ABN Proclaim!",
           "url": "https://3abn.bozztv.com/3abn2/Pro_live/smil:Pro_live.smil/playlist.m3u8",
-          "logo": "https://alpha.uscreencdn.com/images/programs/527372/horizontal/Proclaim-1480x840.1659535750.jpg"
+          "logo": "https://alpha.uscreencdn.com/images/programs/527372/horizontal/Proclaim-1480x840.1659535750.jpg",
+          "epg": "3abn/proc"
         },
         {
           "name": "Dare to dream",
           "url": "https://3abn.bozztv.com/3abn2/d2d_live/smil:d2d_live.smil/playlist.m3u8",
-          "logo": "https://alpha.uscreencdn.com/images/programs/530203/horizontal/D2D-1480x840.1659535818.jpg"
+          "logo": "https://alpha.uscreencdn.com/images/programs/530203/horizontal/D2D-1480x840.1659535818.jpg",
+          "epg": "3abn/dare"
         },
         {
           "name": "3ABN International",
           "url": "https://3abn.bozztv.com/3abn2/Int_live/smil:Int_live.smil/playlist.m3u8",
-          "logo": "https://alpha.uscreencdn.com/images/programs/530218/horizontal/International1480x840.1659537368.jpg"
+          "logo": "https://alpha.uscreencdn.com/images/programs/530218/horizontal/International1480x840.1659537368.jpg",
+          "epg": "3abn/int"
         },
         {
           "name": "3ABN Canada",
           "url": "https://3abn.bozztv.com/3abncanada/3ABN/master.m3u8",
-          "logo": "https://alpha.uscreencdn.com/images/programs/3084114/horizontal/1569f16b-e4a7-4797-b745-f9d50b5ffe13.jpg"
+          "logo": "https://alpha.uscreencdn.com/images/programs/3084114/horizontal/1569f16b-e4a7-4797-b745-f9d50b5ffe13.jpg",
+          "epg": "3abn/canada"
         },
         {
           "name": "Praise Him",
           "url": "https://3abn.bozztv.com/3abn1/PraiseHim/smil:PraiseHim.smil/playlist.m3u8",
-          "logo": "https://alpha.uscreencdn.com/images/programs/531102/horizontal/Praise-Him1480x840.1659537466.jpg"
+          "logo": "https://alpha.uscreencdn.com/images/programs/531102/horizontal/Praise-Him1480x840.1659537466.jpg",
+          "epg": "3abn/praise"
         },
         {
           "name": "3ABN Kids",
           "url": "https://3abn.bozztv.com/3abn2/Kids_live/smil:Kids_live.smil/playlist.m3u8",
-          "logo": "https://alpha.uscreencdn.com/images/programs/532608/horizontal/Kids1480x840.1659537556.jpg"
+          "logo": "https://alpha.uscreencdn.com/images/programs/532608/horizontal/Kids1480x840.1659537556.jpg",
+          "epg": "3abn/kids"
         },
         {
           "name": "3ABN Latino",
           "url": "https://3abn.bozztv.com/3abn2/Lat_live/smil:Lat_live.smil/playlist.m3u8",
-          "logo": "https://alpha.uscreencdn.com/images/programs/534693/horizontal/Latino1480x840.1659537624.jpg"
+          "logo": "https://alpha.uscreencdn.com/images/programs/534693/horizontal/Latino1480x840.1659537624.jpg",
+          "epg": "3abn/lat"
         },
         {
           "name": "Hope Channel",

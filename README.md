@@ -45,7 +45,11 @@ El mosaico muestra una categoría a la vez (al empezar, la primera); al cambiar 
 - `url`: `watch?v=`, `youtu.be/`, `/live/`, `/embed/` o el ID de 11 caracteres. También acepta un stream HLS directo (URL `.m3u8`), que se reproduce con hls.js; si termina o falla se reintenta cada 30 s.
 - `channel`: ID del canal (`UC…`), handle (`@nombre`) o URL del canal; sigue automáticamente el live actual. Si el canal transmite varios lives a la vez, cada uno ocupa su propio tile (`CH 07`, `CH 07-2`, …), que se cierra cuando ese live termina. Los lives nuevos se detectan cada 2 minutos.
 - `max`: opcional, con `channel`; tope de tiles (lives simultáneos) para ese canal.
-- `epg`: opcional; programación del canal en [mi.tv](https://mi.tv) para la guía, como `mi.tv/<país>/<canal>` (la página `mi.tv/cl/canales/chilevision` es `"epg": "mi.tv/cl/chilevision"`). Sin `epg`, la guía muestra el título del live que se está transmitiendo.
+- `epg`: opcional; de dónde sacar la programación del canal para la guía:
+  - `mi.tv/<país>/<canal>`: [mi.tv](https://mi.tv), con el país y el canal de su URL (la página `mi.tv/cl/canales/chilevision` es `"epg": "mi.tv/cl/chilevision"`).
+  - `3abn/<canal>`: la [programación de 3ABN](https://r.3abn.org/sched-app/#/); `<canal>` es `main`, `proc` (Proclaim), `dare` (Dare to Dream), `int` (International), `canada`, `praise` (Praise Him), `kids`, `lat` (Latino) o `radio`.
+
+  Sin `epg`, la guía muestra el título del live que se está transmitiendo. Cada fuente es un módulo en `epg/`; para agregar otra, crear su módulo y sumarlo a `SOURCES` en `epg/index.js`.
 - `logo`: opcional; URL de una imagen con el logo del canal para el indicador de canal y la guía (se muestra sobre una placa blanca). Sin `logo`, se usa el de mi.tv si tiene `epg` o el avatar del canal de YouTube.
 - `polymarket`: slug o URL (`polymarket.com/event/<slug>`) de un evento de Polymarket. El tile no tiene video: muestra la probabilidad de cada outcome, su variación del día y un sparkline de 24 h, actualizados en vivo. Ejemplo: `{ "name": "Brasil 2ª vuelta", "polymarket": "brazil-presidential-election" }`.
 - `outcomes`: opcional, con `polymarket`; cuántos outcomes mostrar (por defecto 4, los más probables).
@@ -55,7 +59,7 @@ El mosaico muestra una categoría a la vez (al empezar, la primera); al cambiar 
 
 Los canales sin señal (error, live terminado, embed deshabilitado) y las celdas vacías muestran una pantalla oscura con el motivo. Los `channel` y los lives terminados se reintentan cada 30 s.
 
-La **guía de programación** (`g`) tiene una fila por canal de la categoría, con la programación de mi.tv para los que tienen `epg`. El canal elegido se ve en vivo en el recuadro y su audio lo sigue; Enter lo sintoniza y lo amplía.
+La **guía de programación** (`g`) tiene una fila por canal de la categoría, con la programación de los que tienen `epg`. El canal elegido se ve en vivo en el recuadro y su audio lo sigue; Enter lo sintoniza y lo amplía.
 
 El **nivelador de volumen** (encendido por defecto, se apaga en Ajustes con `o`) comprime el audio para que los canales fuertes y los suaves suenen parecido. Los ajustes se guardan en `~/.config/livetv/settings.json`.
 

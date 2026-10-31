@@ -1094,8 +1094,9 @@ async function changeSettings(changes) {
 }
 
 // Guía de programación (g): una fila por canal de la categoría. Los que tienen
-// stream.epg muestran la programación de mi.tv; el resto, un solo bloque con
-// el título de su live (o el nombre del canal). Enter sintoniza el canal.
+// stream.epg muestran su programación (mi.tv, 3ABN…: ver epg/); el resto, un
+// solo bloque con el título de su live (o el nombre del canal). Enter
+// sintoniza el canal.
 function openGuide() {
   guideGroups = groups.filter((g) => g.tiles.some((t) => !t.hidden));
   if (!guideGroups.length) return;
