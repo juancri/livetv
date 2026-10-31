@@ -197,7 +197,8 @@
         },
         {
           "name": "Novo Tempo",
-          "channel": "@novotempo"
+          "channel": "@novotempo",
+          "epg": "mi.tv/br/tv-novo-tempo"
         },
         {
           "name": "Novo Tempo Port",
