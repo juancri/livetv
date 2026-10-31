@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, session, webFrameMain, net } = require('electron');
+const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
@@ -10,7 +11,10 @@ app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
 app.userAgentFallback = app.userAgentFallback.replace(/\s*(Electron|livetv)\/\S+/g, '');
 
 const RENDERER_DIR = path.join(__dirname, 'renderer');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+const MIME = {
+  '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
+  '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml',
+};
 
 function configPaths() {
   const i = process.argv.indexOf('--config');
@@ -201,30 +205,89 @@ async function findSchedule(epg) {
 }
 
 // Logo de un canal para el OSD de canal y la guía: el `logo` de la config (una
-// URL, sobre placa como los de mi.tv), el de mi.tv si el stream tiene epg (logos de la señal, pensados para fondo claro: plate), si no el
-// avatar del canal de YouTube (og:image de la página del canal o, para un
-// video suelto, el de su dueño). null si no hay. Se piden de a uno, en cola,
-// para no sumar una ráfaga de páginas de YouTube a la búsqueda de lives al
-// abrir una categoría; un resultado vacío se vuelve a intentar la próxima vez.
+// URL, sobre placa como los de mi.tv), el de mi.tv si el stream tiene epg
+// (logos de la señal, pensados para fondo claro: plate), si no el avatar del
+// canal de YouTube (og:image de la página del canal o, para un video suelto, el
+// de su dueño). null si no hay. Se piden de a uno, en cola, para no sumar una
+// ráfaga de páginas de YouTube a la búsqueda de lives al abrir una categoría;
+// un resultado vacío se vuelve a intentar la próxima vez.
+//
+// Caché en disco (cache/logos/, ignorado por git): las imágenes bajadas y un
+// índice (index.json) de clave → { file, plate, time }, para no volver a
+// scrapear ni bajar nada en cada inicio. Vale LOGO_TTL_MS; si al renovarlo
+// falla, se sigue usando el viejo. El servidor local sirve las imágenes en
+// /logos/, así que el renderer recibe una ruta y no la URL original.
+const LOGO_DIR = path.join(__dirname, 'cache', 'logos');
+const LOGO_INDEX = path.join(LOGO_DIR, 'index.json');
+const LOGO_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const LOGO_EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif', 'image/svg+xml': '.svg' };
 const logoCache = new Map();
 let logoQueue = Promise.resolve();
+let logoIndex = loadLogoIndex();
+
+function loadLogoIndex() {
+  try {
+    return JSON.parse(fs.readFileSync(LOGO_INDEX, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function logoKey(stream) {
+  return stream.logo || stream.epg || stream.channel || stream.url || null;
+}
+
+const cachedLogo = (entry) => ({ url: `/logos/${entry.file}`, plate: entry.plate });
 
 function findLogo(stream) {
-  if (stream.logo) return { url: stream.logo, plate: true };
-  const key = stream.epg || stream.channel || stream.url;
+  const key = logoKey(stream);
   if (!key) return null;
+  const entry = logoIndex[key];
+  const stored = entry && fs.existsSync(path.join(LOGO_DIR, entry.file));
+  if (stored && Date.now() - entry.time < LOGO_TTL_MS) return cachedLogo(entry);
   if (!logoCache.has(key)) {
-    const job = logoQueue.then(() => fetchLogo(stream)).catch(() => null);
+    const job = logoQueue.then(() => fetchLogo(stream)).then((logo) => logo && storeLogo(key, logo)).catch(() => null);
     logoQueue = job;
     logoCache.set(key, job.then((logo) => {
       if (!logo) logoCache.delete(key);
-      return logo;
+      return logo || (stored ? cachedLogo(entry) : null);
     }));
   }
   return logoCache.get(key);
 }
 
+// Baja la imagen de `logo` a cache/logos/ y la anota en el índice. Si no se
+// puede bajar, devuelve la URL original sin guardarla.
+async function storeLogo(key, logo) {
+  let data;
+  let type;
+  try {
+    const res = await net.fetch(logo.url, { headers: { 'User-Agent': app.userAgentFallback } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    type = (res.headers.get('content-type') || '').split(';')[0].trim();
+    data = Buffer.from(await res.arrayBuffer());
+  } catch {
+    return logo;
+  }
+  const ext = LOGO_EXT[type] || path.extname(new URL(logo.url).pathname).toLowerCase() || '.img';
+  const file = crypto.createHash('sha1').update(key).digest('hex').slice(0, 16) + ext;
+  fs.mkdirSync(LOGO_DIR, { recursive: true });
+  writeAtomic(path.join(LOGO_DIR, file), data);
+  const old = logoIndex[key];
+  if (old && old.file !== file) fs.rm(path.join(LOGO_DIR, old.file), { force: true }, () => {});
+  logoIndex[key] = { file, plate: logo.plate, time: Date.now() };
+  writeAtomic(LOGO_INDEX, `${JSON.stringify(logoIndex, null, 2)}\n`);
+  return cachedLogo(logoIndex[key]);
+}
+
+function writeAtomic(file, data) {
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, file);
+}
+
 async function fetchLogo(stream) {
+  if (stream.logo) return { url: stream.logo, plate: true };
   // Avatar a 176 px: alcanza para el OSD y pesa poco.
   const avatar = (url) => ({ url: url.replace(/=s\d+-/, '=s176-'), plate: false });
   if (stream.epg) {
@@ -332,8 +395,11 @@ function youtubeFrames(win) {
 function startServer() {
   const server = http.createServer((req, res) => {
     const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-    const file = path.join(RENDERER_DIR, urlPath === '/' ? 'index.html' : urlPath);
-    if (!file.startsWith(RENDERER_DIR + path.sep)) {
+    // /logos/… sale de la caché de logos; el resto, de renderer/.
+    const isLogo = urlPath.startsWith('/logos/');
+    const dir = isLogo ? LOGO_DIR : RENDERER_DIR;
+    const file = path.join(dir, isLogo ? urlPath.slice('/logos/'.length) : urlPath === '/' ? 'index.html' : urlPath);
+    if (!file.startsWith(dir + path.sep)) {
       res.writeHead(403).end();
       return;
     }

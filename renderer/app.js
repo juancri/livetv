@@ -884,7 +884,7 @@ function renderLogo(el, stream, initials) {
   const logo = logos.get(streamKey(stream));
   el.classList.toggle('plate', !!logo?.plate);
   if (logo) {
-    if (el.firstChild?.src === logo.url) return;
+    if (el.firstChild?.getAttribute?.('src') === logo.url) return;
     const img = document.createElement('img');
     img.src = logo.url;
     img.alt = '';
