@@ -303,7 +303,7 @@ async function addStream({ category, categoryName, stream }) {
 // Ajustes del menú de setup, aparte de la config de streams (que se edita a
 // mano): ~/.config/livetv/settings.json.
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
-const DEFAULT_SETTINGS = { leveler: true };
+const DEFAULT_SETTINGS = { leveler: true, clock24: true };
 let settings = loadSettings();
 
 function loadSettings() {

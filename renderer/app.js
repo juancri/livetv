@@ -2,6 +2,10 @@ const ENDED_RETRY_MS = 30000;
 // Cada cuánto se buscan lives nuevos en los canales que ya están transmitiendo.
 const LIVES_POLL_MS = 120000;
 const CHANNEL_OSD_MS = 3000;
+// Con el programa en curso hay más que leer.
+const PROGRAM_OSD_MS = 5000;
+// Si la programación cargada no tiene nada al aire, se vuelve a pedir tras esto.
+const SCHEDULE_RETRY_MS = 10 * 60 * 1000;
 const CONFIRM_MS = 5000;
 const VOLUME_STEP = 5;
 const OSD_MS = 2500;
@@ -57,6 +61,13 @@ const channelOsd = {
   number: document.querySelector('#osd-channel .osd-number'),
   name: document.querySelector('#osd-channel .osd-name'),
   category: document.querySelector('#osd-channel .osd-category'),
+  program: document.querySelector('#osd-channel .osd-program'),
+  programTitle: document.querySelector('#osd-channel .osd-program-title'),
+  programMeta: document.querySelector('#osd-channel .osd-program-meta'),
+  programTime: document.querySelector('#osd-channel .osd-program-time'),
+  programFill: document.querySelector('#osd-channel .progress-fill'),
+  programLeft: document.querySelector('#osd-channel .osd-program-left'),
+  programNext: document.querySelector('#osd-channel .osd-program-next'),
   timer: null,
 };
 const menu = {
@@ -74,6 +85,11 @@ const SETUP_ITEMS = [
     label: 'Nivelar volumen',
     description: 'Comprime el audio para que los canales fuertes y los suaves suenen parecido',
   },
+  {
+    key: 'clock24',
+    label: 'Reloj de 24 horas',
+    description: 'Muestra los horarios como 18:30 en vez de 6:30 p. m.',
+  },
 ];
 const guide = {
   el: document.getElementById('osd-guide'),
@@ -87,7 +103,7 @@ const guide = {
   ruler: document.querySelector('#osd-guide .guide-ruler'),
   rows: document.querySelector('#osd-guide .guide-rows-inner'),
   now: document.querySelector('#osd-guide .guide-now'),
-  // Programación por stream.epg: { data } o { error }; sin entrada, cargando.
+  // Programación por stream.epg: { data, at } o { error }; sin entrada, cargando.
   schedules: new Map(),
   timer: null,
   previewTimer: null,
@@ -149,7 +165,7 @@ let menuIndex = null;
 // Menú de ajustes (o): índice de la fila elegida, o null si está cerrado.
 let setupIndex = null;
 // Ajustes guardados por main.js en settings.json.
-let settings = { leveler: true };
+let settings = { leveler: true, clock24: true };
 // Ocultos con Shift+H en cualquier categoría, hasta reiniciar: streams de la
 // config (por streamKey) y lives de canales (por videoId).
 const hiddenStreams = new Set();
@@ -275,14 +291,46 @@ function setOffline(tile, offline) {
 function showChannelOsd(tile) {
   channelOsd.tile = tile;
   loadLogo(tile.stream);
-  renderLogo(channelOsd.logo, tile.stream, '');
+  renderLogo(channelOsd.logo, tile.stream, tile.group.name.slice(0, 3));
   channelOsd.number.textContent = tile.number;
   channelOsd.name.textContent = tile.name;
   channelOsd.category.textContent = categories.length > 1 ? categories[categoryIndex].name : '';
   channelOsd.el.classList.toggle('muted', muted);
+  const program = renderChannelProgram(tile);
   channelOsd.el.hidden = false;
   clearTimeout(channelOsd.timer);
-  channelOsd.timer = setTimeout(() => { channelOsd.el.hidden = true; }, CHANNEL_OSD_MS);
+  channelOsd.timer = setTimeout(() => { channelOsd.el.hidden = true; }, program ? PROGRAM_OSD_MS : CHANNEL_OSD_MS);
+}
+
+// Programa en curso en el OSD de canal: con programación (stream.epg), título,
+// horario, barra de progreso y lo que sigue; sin ella, solo el título del live;
+// sin nada, un texto atenuado (.empty) en el mismo lugar. La programación se
+// pide la primera vez y el OSD se completa al llegar. Devuelve si se conoce el
+// programa.
+function renderChannelProgram(tile) {
+  const { epg } = tile.stream;
+  const now = Date.now();
+  // La programación es la del canal: no vale para sus lives extra (CH 07-2…).
+  const schedule = epg && tile === tile.group.tiles[0] ? guide.schedules.get(epg) : null;
+  const programs = schedule?.data?.programs || [];
+  const k = programs.findIndex((p) => p.start <= now && now < p.stop);
+  if (epg && tile === tile.group.tiles[0]
+    && (!schedule || (schedule.data && k === -1 && now - schedule.at > SCHEDULE_RETRY_MS))) loadSchedule(epg);
+  const current = programs[k];
+  const title = current?.title || (tile.offline ? '' : tile.player?.getVideoData?.()?.title || tile.title || '');
+  const loading = epg && tile === tile.group.tiles[0] && !schedule;
+  channelOsd.program.classList.toggle('empty', !title);
+  channelOsd.programTitle.textContent = title
+    || (tile.offline ? 'Sin señal' : loading ? 'Cargando programación…' : 'Sin información del programa');
+  channelOsd.programMeta.hidden = !current;
+  const next = programs[k + 1];
+  channelOsd.programNext.textContent = current && next ? `A continuación: ${clock(next.start)} ${next.title}` : '';
+  if (current) {
+    channelOsd.programTime.textContent = `${clock(current.start)} – ${clock(current.stop)}`;
+    channelOsd.programFill.style.width = `${(now - current.start) / (current.stop - current.start) * 100}%`;
+    channelOsd.programLeft.textContent = `${Math.ceil((current.stop - now) / 60000)} min`;
+  }
+  return !!title;
 }
 
 // Tile que suena: el enfocado o, si no tiene audio, el último video enfocado.
@@ -653,7 +701,7 @@ function updateRow(market, row) {
 }
 
 function clockTime() {
-  return new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  return new Date().toLocaleTimeString('es-CL', { ...clockFormat(), second: '2-digit' });
 }
 
 function renderMarket(tile, market, data) {
@@ -872,7 +920,9 @@ function loadLogo(stream) {
   window.livetv.findLogo(stream)
     .then((logo) => {
       logos.set(key, logo);
-      if (channelOsd.tile?.stream === stream && !channelOsd.el.hidden) renderLogo(channelOsd.logo, stream, '');
+      if (channelOsd.tile?.stream === stream && !channelOsd.el.hidden) {
+        renderLogo(channelOsd.logo, stream, channelOsd.tile.group.name.slice(0, 3));
+      }
       if (guideRow !== null) renderGuide();
     })
     .catch(() => {})
@@ -1159,12 +1209,15 @@ function schedulePreview(group) {
 function loadSchedule(epg) {
   guide.schedules.delete(epg);
   window.livetv.findSchedule(epg)
-    .then((data) => guide.schedules.set(epg, { data }))
+    .then((data) => guide.schedules.set(epg, { data, at: Date.now() }))
     .catch((err) => {
       console.warn(`No se pudo leer la programación ${epg}:`, err);
       guide.schedules.set(epg, { error: true });
     })
-    .finally(() => { if (guideRow !== null) renderGuide(); });
+    .finally(() => {
+      if (guideRow !== null) renderGuide();
+      if (channelOsd.tile?.stream.epg === epg && !channelOsd.el.hidden) showChannelOsd(channelOsd.tile);
+    });
 }
 
 // Título del live que está sonando en el canal, si se conoce.
@@ -1196,7 +1249,14 @@ function guideLogo(group, el) {
   renderLogo(el, group.stream, group.name.slice(0, 3));
 }
 
-const clock = (ms) => new Date(ms).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
+// Horas según el ajuste clock24: 18:30 o 6:30 p. m.
+function clockFormat() {
+  return settings.clock24
+    ? { hour: '2-digit', minute: '2-digit', hour12: false }
+    : { hour: 'numeric', minute: '2-digit', hour12: true };
+}
+
+const clock = (ms) => new Date(ms).toLocaleTimeString('es-CL', clockFormat());
 
 // "20:00 – 21:30", con el día delante si no es hoy.
 function programTime(p) {

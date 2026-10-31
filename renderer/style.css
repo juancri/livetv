@@ -410,14 +410,15 @@ kbd {
   padding: 22px 32px;
 }
 #osd .osd-label { font: var(--text-label); font-size: 24px; min-width: 110px; }
-#osd .progress {
-  flex: 1;
+#osd .progress { flex: 1; }
+/* ProgressBar del design system: pista translúcida, relleno lima. */
+.progress {
   height: 8px;
   border-radius: var(--radius-pill);
   background: var(--progress-track);
   overflow: hidden;
 }
-#osd .progress-fill {
+.progress-fill {
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
@@ -435,32 +436,38 @@ kbd {
 #osd.muted .icon { color: var(--text-tertiary); }
 #osd.muted .progress-fill { background: var(--text-disabled); }
 
-/* Canal: tarjeta arriba a la derecha con el logo, la categoría, el número y
-   el nombre. */
+/* Canal: banner abajo, a lo ancho de la zona segura, con el logo (o las
+   iniciales), la categoría, el número y el nombre, y el programa en curso a
+   la derecha. Siempre con el mismo formato y la columna del canal de ancho
+   fijo, para que al hacer zapping todo quede en su lugar. El volumen sube por
+   encima mientras se ve. */
 #osd-channel {
-  top: var(--safe-y);
-  right: var(--safe-x);
+  left: 50%;
+  bottom: var(--safe-y);
+  translate: -50% 0;
   display: flex;
   align-items: center;
   gap: 28px;
-  max-width: 1100px;
-  padding: 24px 36px 24px 24px;
+  width: calc(100% - 2 * var(--safe-x));
+  padding: 20px 36px 20px 20px;
 }
-.osd-channel-text { min-width: 0; }
+#osd-channel:not([hidden]) ~ #osd { bottom: calc(var(--safe-y) + 168px); }
+.osd-channel-text { flex: none; width: 480px; }
 
 /* Logo de canal (renderLogo): el avatar de YouTube a sangre; el logo de la
    señal (mi.tv, .plate) sobre una placa blanca, como en los decos. */
 .osd-logo {
   display: grid;
   place-items: center;
-  width: 120px;
-  height: 120px;
+  width: 104px;
+  height: 104px;
   flex: none;
   border-radius: var(--radius-md);
   background: var(--surface-raised);
   overflow: hidden;
 }
-.osd-logo:empty { display: none; }
+/* Sin logo, las iniciales del canal. */
+.osd-logo { font: 800 32px/1 var(--font-display); color: var(--text-secondary); }
 .osd-logo img,
 .guide-logo img { width: 100%; height: 100%; object-fit: cover; }
 .osd-logo.plate,
@@ -468,7 +475,7 @@ kbd {
 .osd-logo.plate img,
 .guide-logo.plate img { object-fit: contain; padding: 8%; }
 .osd-category {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   font: var(--text-caption);
   color: var(--text-tertiary);
 }
@@ -485,13 +492,54 @@ kbd {
 .osd-muted { display: none; }
 #osd-channel.muted .osd-muted { display: inline-flex; }
 .osd-name {
-  margin-top: 10px;
-  font: 700 56px/1.15 var(--font-display);
+  margin-top: 8px;
+  font: 700 44px/1.15 var(--font-display);
   letter-spacing: var(--tracking-tight);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Programa en curso (renderChannelProgram): título, horario con barra de
+   progreso y lo que sigue, separado del canal por una línea vertical. */
+.osd-program {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 32px;
+  border-left: 1px solid var(--border-default);
+}
+.osd-program-meta[hidden] { display: none; }
+.osd-program.empty .osd-program-title { color: var(--text-tertiary); }
+.osd-program-title {
+  font: 600 30px/1.25 var(--font-ui);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.osd-program-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 12px;
+  font: 500 20px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.osd-program-meta .progress { flex: 1; height: 6px; }
+.osd-program-left { color: var(--text-tertiary); }
+.osd-program-next {
+  margin-top: 10px;
+  font: var(--text-caption);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.osd-program-next:empty { display: none; }
 
 /* Diálogos (categorías, agregar canal, confirmar): panel sobre un scrim desenfocado. */
 .osd-scrim {
