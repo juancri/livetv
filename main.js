@@ -200,8 +200,8 @@ async function findSchedule(epg) {
   return data;
 }
 
-// Logo de un canal para el OSD de canal y la guía: el de mi.tv si el stream
-// tiene epg (logos de la señal, pensados para fondo claro: plate), si no el
+// Logo de un canal para el OSD de canal y la guía: el `logo` de la config (una
+// URL, sobre placa como los de mi.tv), el de mi.tv si el stream tiene epg (logos de la señal, pensados para fondo claro: plate), si no el
 // avatar del canal de YouTube (og:image de la página del canal o, para un
 // video suelto, el de su dueño). null si no hay. Se piden de a uno, en cola,
 // para no sumar una ráfaga de páginas de YouTube a la búsqueda de lives al
@@ -210,6 +210,7 @@ const logoCache = new Map();
 let logoQueue = Promise.resolve();
 
 function findLogo(stream) {
+  if (stream.logo) return { url: stream.logo, plate: true };
   const key = stream.epg || stream.channel || stream.url;
   if (!key) return null;
   if (!logoCache.has(key)) {
