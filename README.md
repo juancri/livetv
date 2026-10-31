@@ -6,7 +6,7 @@ Mosaico de streams en vivo de YouTube (Electron). Solo el tile con foco (anillo 
 
 | Cambio de canal | Volumen |
 |---|---|
-| ![Indicador de canal con logo, número y nombre](docs/screenshots/canal.jpg) | ![Indicador de volumen](docs/screenshots/volumen.jpg) |
+| ![Banner de canal con logo, número, nombre y programa en curso](docs/screenshots/canal.jpg) | ![Indicador de volumen](docs/screenshots/volumen.jpg) |
 | **Guía de programación** (`g`) | **Categorías** (`c`) |
 | ![Guía de programación con vista previa en vivo](docs/screenshots/guia.jpg) | ![Menú de categorías](docs/screenshots/categorias.jpg) |
 | **Agregar canal** | **Ajustes** (`o`) |
@@ -59,9 +59,18 @@ El mosaico muestra una categoría a la vez (al empezar, la primera); al cambiar 
 
 Los canales sin señal (error, live terminado, embed deshabilitado) y las celdas vacías muestran una pantalla oscura con el motivo. Los `channel` y los lives terminados se reintentan cada 30 s.
 
+Al **cambiar de canal** aparece un banner abajo con el logo (o las iniciales), el número y el nombre del canal y, a la derecha, el programa en curso: con `epg`, su horario, una barra de progreso, los minutos que quedan y lo que sigue; sin `epg`, el título del live. Siempre tiene el mismo formato, para leerlo de un vistazo al hacer zapping.
+
 La **guía de programación** (`g`) tiene una fila por canal de la categoría, con la programación de los que tienen `epg`. El canal elegido se ve en vivo en el recuadro y su audio lo sigue; Enter lo sintoniza y lo amplía.
 
-El **nivelador de volumen** (encendido por defecto, se apaga en Ajustes con `o`) comprime el audio para que los canales fuertes y los suaves suenen parecido. Los ajustes se guardan en `~/.config/livetv/settings.json`.
+Los logos y la programación se guardan en `cache/` (ignorado por git): los logos valen 7 días y la programación 30 minutos; si renovarlos falla, se sigue usando lo guardado.
+
+En **Ajustes** (`o`):
+
+- **Nivelar volumen** (encendido por defecto): comprime el audio para que los canales fuertes y los suaves suenen parecido.
+- **Reloj de 24 horas** (encendido por defecto): apagado, los horarios del banner, la guía y Polymarket se muestran como `6:30 p. m.`.
+
+Los ajustes se guardan en `~/.config/livetv/settings.json`.
 
 ## Teclas
 
@@ -76,7 +85,7 @@ El **nivelador de volumen** (encendido por defecto, se apaga en Ajustes con `o`)
 | Shift+H | ocultar el stream enfocado y cerrar su reproductor (pide confirmación: H/Enter sí, otra tecla no); queda oculto en todas las categorías hasta reiniciar la app |
 | c | menú de categorías: ↑↓ / j k elegir, Enter o 1–9 abrir, c / Esc cerrar; al final, **Agregar canal** (o `a`) y **Ajustes** |
 | g | guía de programación: ↑↓ canal, ←→ programa, Enter sintoniza, g / Esc cerrar |
-| o | ajustes (nivelador de volumen) |
+| o | ajustes (nivelador de volumen, reloj de 24 horas) |
 | [ / ] · RePág / AvPág | categoría anterior / siguiente |
 | f / F11 | pantalla completa |
 | ? | ayuda |
