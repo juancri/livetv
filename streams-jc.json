@@ -188,7 +188,7 @@
       ]
     },
     {
-      "name": "Religiosos",
+      "name": "Adventistas",
       "streams": [
         {
           "name": "Nuevo Tiempo",
@@ -295,6 +295,145 @@
         {
           "name": "LLBN Latino",
           "url": "https://brightstar-latino-pull-secure.akamaized.net/brightstarlatino/stream.m3u8"
+        }
+      ]
+    },
+    {
+      "name": "Radios Adventistas EN",
+      "streams": [
+        {
+          "name": "3ABN Radio",
+          "url": "https://3abn.streamguys1.com/abr/english/playlist.m3u8",
+          "logo": "https://3abn.org/img/radio/3abn-radio-logo.png",
+          "epg": "3abn/radio"
+        },
+        {
+          "name": "3ABN Radio Music Channel",
+          "url": "https://war.streamguys1.com:7185/MC01",
+          "logo": "https://3abn.org/img/logos/radio/3abn-radio-music-channel.png"
+        },
+        {
+          "name": "3ABN Radio Australia",
+          "url": "https://stream.3abnaustralia.org.au:8444/live/radio_aust/playlist.m3u8",
+          "logo": "https://alpha.uscreencdn.com/images/programs/705657/horizontal/3ABN-AU-Radio-1480x840.1659539954.jpg"
+        },
+        {
+          "name": "LifeTalk Radio",
+          "url": "https://ais-sa1.streamon.fm/7013_64k.aac",
+          "logo": "https://lifetalk.net/wp-content/themes/lifetalk24/img/logo.png"
+        },
+        {
+          "name": "Classical WSMC",
+          "url": "https://s4.voscast.com:8813/stream",
+          "logo": "https://upload.wikimedia.org/wikipedia/en/1/10/WSMC-FM_logo.webp"
+        },
+        {
+          "name": "Positive Life Radio",
+          "url": "https://ice10.securenetsystems.net/PLR",
+          "logo": "https://plr.org/wp-content/uploads/2020/09/cropped-PLR-emblem-192x192.png"
+        },
+        {
+          "name": "KJRN 88.3 The Journey",
+          "url": "http://ice42.securenetsystems.net/KJRN",
+          "logo": "https://883thejourney.org/wp-content/uploads/2023/07/journey2fi1-150x103.png"
+        },
+        {
+          "name": "Strong Tower Radio",
+          "url": "https://strongtowerradio.streamguys1.com/live"
+        }
+      ]
+    },
+    {
+      "name": "Radios Adventistas ES / PT",
+      "streams": [
+        {
+          "name": "3ABN Radio Latino",
+          "url": "https://3abn.streamguys1.com/abr/latino/playlist.m3u8",
+          "logo": "https://alpha.uscreencdn.com/images/programs/697110/horizontal/Latino-1480x840.1659538867.jpg"
+        },
+        {
+          "name": "Radio Nuevo Tiempo Chile",
+          "url": "https://stream.zeno.fm/xnk291h7e8zuv",
+          "logo": "https://cdn-profiles.tunein.com/s54128/images/logoq.png?t=636548207183470000"
+        },
+        {
+          "name": "Radio Nuevo Tiempo Paraguay",
+          "url": "https://radio02.com:7022/stream",
+          "logo": "https://cdn-profiles.tunein.com/s334752/images/logoq.jpg?t=638647846680000000"
+        },
+        {
+          "name": "Rádio RCS 91.2",
+          "url": "http://centova.radio.com.pt:8445/stream",
+          "logo": "https://cdn-profiles.tunein.com/s83945/images/logoq.png?t=638162080610000000"
+        }
+      ]
+    },
+    {
+      "name": "Radios Adventistas (Otras)",
+      "streams": [
+        {
+          "name": "Hope Radio",
+          "url": "https://www.radioking.com/play/hope-radio-1",
+          "logo": "https://hoperadio.live/upload/design/5e9dd781241937.89330927.png"
+        },
+        {
+          "name": "HopeRadio Suisse",
+          "url": "https://stream.hoperadio.fr/hoperadio-suisse"
+        },
+        {
+          "name": "AdventRadio",
+          "url": "http://51.210.179.55:8000/stream"
+        },
+        {
+          "name": "Radio Adventiste Béthanie",
+          "url": "https://stream.zeno.fm/kp5stfdae3quv",
+          "logo": "https://zenoimages.s3.us-west-001.backblazeb2.com/agxzfnplbm8tc3RhdHNyMgsSCkF1dGhDbGllbnQYgICg9vSm_woMCxIOU3RhdGlvblByb2ZpbGUYgICg5t2BxAgMogEEemVubw/cards/80ba3adc-440a-4a0d-83c1-7ebc5fbbe896"
+        },
+        {
+          "name": "Radio Vocea Speranței",
+          "url": "https://live.rvs.ro/play",
+          "logo": "https://rvs.ro/imgs/logo.png"
+        },
+        {
+          "name": "Reménység Hangja",
+          "url": "https://live.rvs.ro/mg",
+          "logo": "https://players.rcast.net/uploads/images/202409/img_x300_66d4651db6be74-74421204-37700107.jpg"
+        },
+        {
+          "name": "Голос Надії",
+          "url": "https://s4.radio.co/s052c88338/low",
+          "logo": "https://cdn-radiotime-logos.tunein.com/s192763q.png"
+        },
+        {
+          "name": "Radio Mojdeh",
+          "url": "http://ic2326.c1261.fast-serv.com/rm128",
+          "logo": "https://cdn-profiles.tunein.com/s156150/images/logoq.png?t=637360392440000000"
+        },
+        {
+          "name": "AWR 89.1 Manila",
+          "url": "http://192.53.113.120:8000/stream"
+        },
+        {
+          "name": "Adventist Radio South Philippines",
+          "url": "https://stream3.awr.live/listen/adventist_radio_southph/radio.mp3"
+        },
+        {
+          "name": "DXBH Hope Radio 103.7",
+          "url": "https://stream.dxbh.net/main_mp3",
+          "logo": "https://dxbh.net/awr-logo.png"
+        },
+        {
+          "name": "AWR Zamboanga",
+          "url": "https://awrzpm.radio.fm:8000/radio.mp3"
+        },
+        {
+          "name": "AWR SIDmedia",
+          "url": "https://edge.iono.fm/xice/187_medium.aac"
+        },
+        {
+          "name": "Morning Star Radio",
+          "url": "https://stream.zeno.fm/cumarh23pvduv",
+          "logo": "https://cdn-profiles.tunein.com/s201151/images/logoq.jpg?t=638325160880000000"
         }
       ]
     },
