@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, webFrameMain } = require('electron');
+const { app, BrowserWindow, ipcMain, session, webFrameMain, net } = require('electron');
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
@@ -44,7 +44,9 @@ function channelUrl(value) {
 }
 
 async function fetchPage(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': app.userAgentFallback } });
+  // net.fetch (red de Chromium): el fetch de Node corta en 16 KB de cabeceras
+  // y YouTube ya las supera (UND_ERR_HEADERS_OVERFLOW).
+  const res = await net.fetch(url, { headers: { 'User-Agent': app.userAgentFallback } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.text();
 }
@@ -92,7 +94,7 @@ function polymarketSlug(value) {
 }
 
 async function fetchJson(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': app.userAgentFallback } });
+  const res = await net.fetch(url, { headers: { 'User-Agent': app.userAgentFallback } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
