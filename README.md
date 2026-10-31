@@ -1,27 +1,29 @@
 # LiveTV
 
-Mosaico de streams en vivo de YouTube (Electron). Solo el tile con foco (anillo blanco) tiene audio.
+**English** · [Español](README.es.md)
 
-![Mosaico de canales](docs/screenshots/mosaico.jpg)
+A mosaic of live channels (Electron): YouTube lives, HLS streams (`.m3u8`), Polymarket markets and Windy maps, with a program guide. It is driven with the keyboard like a TV; only the focused tile (white ring) plays audio. The user interface is in Spanish.
 
-| Cambio de canal | Volumen |
+![Channel mosaic](docs/screenshots/mosaico.jpg)
+
+| Channel change | Volume |
 |---|---|
-| ![Banner de canal con logo, número, nombre y programa en curso](docs/screenshots/canal.jpg) | ![Indicador de volumen](docs/screenshots/volumen.jpg) |
-| **Guía de programación** (`g`) | **Categorías** (`c`) |
-| ![Guía de programación con vista previa en vivo](docs/screenshots/guia.jpg) | ![Menú de categorías](docs/screenshots/categorias.jpg) |
-| **Agregar canal** | **Ajustes** (`o`) |
-| ![Formulario para agregar un canal](docs/screenshots/agregar.jpg) | ![Menú de ajustes](docs/screenshots/ajustes.jpg) |
-| **Polymarket** | **Ayuda** (`?`) |
-| ![Tile de un mercado de Polymarket](docs/screenshots/polymarket.jpg) | ![Atajos de teclado](docs/screenshots/ayuda.jpg) |
+| ![Channel banner with logo, number, name and current program](docs/screenshots/canal.jpg) | ![Volume indicator](docs/screenshots/volumen.jpg) |
+| **Program guide** (`g`) | **Categories** (`c`) |
+| ![Program guide with live preview](docs/screenshots/guia.jpg) | ![Categories menu](docs/screenshots/categorias.jpg) |
+| **Add channel** | **Settings** (`o`) |
+| ![Form to add a channel](docs/screenshots/agregar.jpg) | ![Settings menu](docs/screenshots/ajustes.jpg) |
+| **Polymarket** | **Help** (`?`) |
+| ![Polymarket market tile](docs/screenshots/polymarket.jpg) | ![Keyboard shortcuts](docs/screenshots/ayuda.jpg) |
 
-## Uso
+## Usage
 
 ```sh
 npm install
-npm start                      # o: npm start -- --config /ruta/streams.json
+npm start                      # or: npm start -- --config /path/streams.json
 ```
 
-La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `./streams.json` (una config de ejemplo mínima). Para una propia sin tocar el repo: `mkdir -p ~/.config/livetv && cp streams.json ~/.config/livetv/`. `streams-jc.json` es una config de ejemplo completa (Chile, Argentina, internacionales, religiosos): `npm start -- --config streams-jc.json`.
+The config is looked up in `--config`, then `~/.config/livetv/streams.json`, then `./streams.json` (a minimal example config). To keep your own without touching the repo: `mkdir -p ~/.config/livetv && cp streams.json ~/.config/livetv/`. `streams-jc.json` is a complete example config (Chile, Argentina, international and religious channels): `npm start -- --config streams-jc.json`.
 
 ```json
 {
@@ -38,56 +40,59 @@ La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `
 }
 ```
 
-Desde el menú de categorías (`c`) se puede **agregar un canal** sin editar el archivo: se escribe un handle (`@canal`), una URL de canal o video de YouTube, una URL `.m3u8`, la de un evento de Polymarket o la de un mapa de windy.com, un nombre opcional (si queda vacío se usa el título de YouTube o Polymarket) y la categoría (←→). Se guarda al final de esa categoría en el archivo de config (que se reescribe con formato JSON estándar) y se abre en el acto.
+From the categories menu (`c`, then **Add channel** or `a`) you can **add a channel** (*Agregar canal*) without editing the file: type a handle (`@channel`), a YouTube channel or video URL, an `.m3u8` URL, a Polymarket event URL or a windy.com map URL, an optional name (if left empty, the YouTube or Polymarket title is used) and the category (←→); ↑↓ or Tab move between fields, Enter saves and Esc cancels. It is appended to that category in the config file (which is rewritten as standard JSON) and opens right away.
 
-El mosaico muestra una categoría a la vez (al empezar, la primera); al cambiar se cierran los streams de la anterior. Un mismo canal puede repetirse en varias categorías. En vez de `categories` se puede usar directamente una lista `"streams": [...]`, que queda como una sola categoría.
+The mosaic shows one category at a time (the first one at startup); switching categories closes the previous one's streams. The same channel can appear in several categories. Instead of `categories` you can use a plain `"streams": [...]` list, which becomes a single category.
 
-- `url`: `watch?v=`, `youtu.be/`, `/live/`, `/embed/` o el ID de 11 caracteres. También acepta un stream HLS directo (URL `.m3u8`), que se reproduce con hls.js; si termina o falla se reintenta cada 30 s.
-- `channel`: ID del canal (`UC…`), handle (`@nombre`) o URL del canal; sigue automáticamente el live actual. Si el canal transmite varios lives a la vez, cada uno ocupa su propio tile (`CH 07`, `CH 07-2`, …), que se cierra cuando ese live termina. Los lives nuevos se detectan cada 2 minutos.
-- `max`: opcional, con `channel`; tope de tiles (lives simultáneos) para ese canal.
-- `epg`: opcional; de dónde sacar la programación del canal para la guía:
-  - `mi.tv/<país>/<canal>`: [mi.tv](https://mi.tv), con el país y el canal de su URL (la página `mi.tv/cl/canales/chilevision` es `"epg": "mi.tv/cl/chilevision"`).
-  - `3abn/<canal>`: la [programación de 3ABN](https://r.3abn.org/sched-app/#/); `<canal>` es `main`, `proc` (Proclaim), `dare` (Dare to Dream), `int` (International), `canada`, `praise` (Praise Him), `kids`, `lat` (Latino) o `radio`.
+- `url`: `watch?v=`, `youtu.be/`, `/live/`, `/embed/` or the 11-character ID. It also accepts a direct HLS stream (`.m3u8` URL), played with hls.js; if it ends or fails, it is retried every 30 s.
+- `channel`: channel ID (`UC…`), handle (`@name`) or channel URL; automatically follows the current live. If the channel streams several lives at once, each one gets its own tile (`CH 07`, `CH 07-2`, …), which closes when that live ends. New lives are detected every 2 minutes.
+- `max`: optional, with `channel`; maximum number of tiles (simultaneous lives) for that channel.
+- `epg`: optional; where to get the channel's schedule for the guide:
+  - `mi.tv/<country>/<channel>`: [mi.tv](https://mi.tv), with the country and channel from its URL (the page `mi.tv/cl/canales/chilevision` is `"epg": "mi.tv/cl/chilevision"`).
+  - `3abn/<channel>`: the [3ABN schedule](https://r.3abn.org/sched-app/#/); `<channel>` is `main`, `proc` (Proclaim), `dare` (Dare to Dream), `int` (International), `canada`, `praise` (Praise Him), `kids`, `lat` (Latino) or `radio`.
 
-  Sin `epg`, la guía muestra el título del live que se está transmitiendo. Cada fuente es un módulo en `epg/`; para agregar otra, crear su módulo y sumarlo a `SOURCES` en `epg/index.js`.
-- `logo`: opcional; URL de una imagen con el logo del canal para el indicador de canal y la guía (se muestra sobre una placa blanca). Sin `logo`, se usa el de mi.tv si tiene `epg` o el avatar del canal de YouTube.
-- `polymarket`: slug o URL (`polymarket.com/event/<slug>`) de un evento de Polymarket. El tile no tiene video: muestra la probabilidad de cada outcome, su variación del día y un sparkline de 24 h, actualizados en vivo. Ejemplo: `{ "name": "Brasil 2ª vuelta", "polymarket": "brazil-presidential-election" }`.
-- `outcomes`: opcional, con `polymarket`; cuántos outcomes mostrar (por defecto 4, los más probables).
-- `windy`: URL de un mapa de windy.com (`https://www.windy.com/?wind,-33.45,-70.66,7`: capa, latitud, longitud y zoom, tal como queda en la barra de direcciones; con `/lat/lon` en el path se marca ese punto y se muestra su pronóstico) o una URL de `embed.windy.com` (el widget de "Embed" de Windy, con todas sus opciones). El tile no tiene audio y se recarga cada hora.
-- Sin `url`, `channel`, `polymarket` ni `windy`: tile vacío "Sin canal".
-- `columns`: opcional, global o por categoría; por defecto `ceil(sqrt(N))`.
+  Without `epg`, the guide shows the title of the live being streamed. Each source is a module in `epg/`; to add another one, create its module and add it to `SOURCES` in `epg/index.js`.
+- `logo`: optional; URL of an image with the channel's logo for the channel banner and the guide (shown on a white plate). Without `logo`, the mi.tv logo is used if the channel has `epg`, otherwise the YouTube channel avatar.
+- `polymarket`: slug or URL (`polymarket.com/event/<slug>`) of a Polymarket event. The tile has no video: it shows each outcome's probability, its daily change and a 24 h sparkline, updated live. Example: `{ "name": "Brasil 2ª vuelta", "polymarket": "brazil-presidential-election" }`.
+- `outcomes`: optional, with `polymarket`; how many outcomes to show (4 by default, the most likely ones).
+- `windy`: URL of a windy.com map (`https://www.windy.com/?wind,-33.45,-70.66,7`: layer, latitude, longitude and zoom, as shown in the address bar; with `/lat/lon` in the path, that point is marked and its forecast shown) or an `embed.windy.com` URL (Windy's "Embed" widget, with all its options). The tile has no audio and reloads every hour.
+- Without `url`, `channel`, `polymarket` or `windy`: an empty "Sin canal" (no channel) tile.
+- `columns`: optional, global or per category; defaults to `ceil(sqrt(N))`.
 
-Los canales sin señal (error, live terminado, embed deshabilitado) y las celdas vacías muestran una pantalla oscura con el motivo. Los `channel` y los lives terminados se reintentan cada 30 s.
+Channels with no signal (error, live ended, embedding disabled) leave the mosaic until they are back on air, so the grid doesn't jump with every retry; the `s` key shows them, with a dark screen and the reason. `channel` entries and ended lives are retried every 30 s. Entries without a channel and leftover grid cells show that same screen.
 
-Al **cambiar de canal** aparece un banner abajo con el logo (o las iniciales), el número y el nombre del canal y, a la derecha, el programa en curso: con `epg`, su horario, una barra de progreso, los minutos que quedan y lo que sigue; sin `epg`, el título del live. Siempre tiene el mismo formato, para leerlo de un vistazo al hacer zapping.
+Audio is global, like on a TV: volume and mute apply to every channel. If the focused tile has no audio (Polymarket or Windy), the last focused video keeps playing. Clicking a tile also focuses it.
 
-La **guía de programación** (`g`) tiene una fila por canal de la categoría, con la programación de los que tienen `epg`. El canal elegido se ve en vivo en el recuadro y su audio lo sigue; Enter lo sintoniza y lo amplía.
+When you **change channels**, a banner appears at the bottom with the channel's logo (or initials), number and name and, on the right, the current program: with `epg`, its time slot, a progress bar, the minutes left and what's next; without `epg`, the live's title. It always keeps the same layout, so it can be read at a glance while channel surfing.
 
-Los logos y la programación se guardan en `cache/` (ignorado por git): los logos valen 7 días y la programación 30 minutos; si renovarlos falla, se sigue usando lo guardado.
+The **program guide** (`g`) has one row per channel in the category, with the schedule of those that have `epg`. The selected channel plays live in the preview box and the audio follows it; Enter tunes to it and enlarges it.
 
-En **Ajustes** (`o`):
+Logos and schedules are stored in `cache/` (ignored by git): logos are kept for 7 days and schedules for 30 minutes; if refreshing them fails, the stored copy is still used.
 
-- **Nivelar volumen** (encendido por defecto): comprime el audio para que los canales fuertes y los suaves suenen parecido.
-- **Reloj de 24 horas** (encendido por defecto): apagado, los horarios del banner, la guía y Polymarket se muestran como `6:30 p. m.`.
+In **Settings** (`o`, *Ajustes*):
 
-Los ajustes se guardan en `~/.config/livetv/settings.json`.
+- **Volume leveler** (*Nivelar volumen*, on by default): compresses the audio so loud and quiet channels sound similar.
+- **24-hour clock** (*Reloj de 24 horas*, on by default): when off, times in the banner, the guide and Polymarket are shown as `6:30 p. m.`.
 
-## Teclas
+Settings are saved in `~/.config/livetv/settings.json`.
 
-| Tecla | Acción |
+## Keys
+
+| Key | Action |
 |---|---|
-| ←↑→↓ / h j k l | mover foco |
-| 1–9 | ir al canal N |
-| Enter / Espacio | ampliar/restaurar el tile enfocado |
-| m | silenciar/reactivar el audio (global) |
-| + / − | volumen global, se mantiene al cambiar de canal (OSD en pantalla; quita el silencio) |
-| r | recargar el stream enfocado |
-| Shift+H | ocultar el stream enfocado y cerrar su reproductor (pide confirmación: H/Enter sí, otra tecla no); queda oculto en todas las categorías hasta reiniciar la app |
-| c | menú de categorías: ↑↓ / j k elegir, Enter o 1–9 abrir, c / Esc cerrar; al final, **Agregar canal** (o `a`) y **Ajustes** |
-| g | guía de programación: ↑↓ canal, ←→ programa, Enter sintoniza, g / Esc cerrar |
-| o | ajustes (nivelador de volumen, reloj de 24 horas) |
-| [ / ] · RePág / AvPág | categoría anterior / siguiente |
-| f / F11 | pantalla completa |
-| ? | ayuda |
-| Esc | cerrar ampliación/ayuda, o salir |
-| q | salir |
+| ←↑→↓ / h j k l | move focus |
+| 1–9 | go to channel N (`CH 0N`) |
+| Enter / Space | enlarge/restore the focused tile |
+| m | mute/unmute audio (global) |
+| + / − | global volume, kept when changing channels (on-screen OSD; unmutes) |
+| r | reload the focused stream (for a `channel`, also looks for its lives again) |
+| s | show or hide channels with no signal |
+| Shift+H | hide the focused stream and close its player (asks for confirmation: H/Enter yes, any other key no); it stays hidden in every category until the app restarts |
+| c | categories menu: ↑↓ / j k select, Enter or 1–9 open, c / Esc close; at the end, **Add channel** (or `a`) and **Settings** (or `o`) |
+| g | program guide: ↑↓ / j k channel, ←→ / h l program, Enter tunes in, g / Esc close |
+| o | settings (volume leveler, 24-hour clock) |
+| [ / ] · PgUp / PgDn | previous / next category |
+| f / F11 | fullscreen |
+| ? | help |
+| Esc | close the enlarged tile or the help; if nothing is open, quit |
+| q | quit |
