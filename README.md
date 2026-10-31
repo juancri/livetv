@@ -18,11 +18,10 @@ Mosaico de streams en vivo de YouTube (Electron). Solo el tile con foco (anillo 
 
 ```sh
 npm install
-mkdir -p ~/.config/livetv && cp streams.example.json ~/.config/livetv/streams.json
 npm start                      # o: npm start -- --config /ruta/streams.json
 ```
 
-La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `./streams.json`.
+La config se busca en `--config`, luego `~/.config/livetv/streams.json`, luego `./streams.json` (una config de ejemplo mínima). Para una propia sin tocar el repo: `mkdir -p ~/.config/livetv && cp streams.json ~/.config/livetv/`. `streams-jc.json` es una config de ejemplo completa (Chile, Argentina, internacionales, religiosos): `npm start -- --config streams-jc.json`.
 
 ```json
 {

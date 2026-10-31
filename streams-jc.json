@@ -1,0 +1,301 @@
+{
+  "columns": null,
+  "categories": [
+    {
+      "name": "Chile",
+      "streams": [
+        {
+          "name": "T13 en Vivo",
+          "channel": "@T13_cl"
+        },
+        {
+          "name": "Canal 13",
+          "channel": "@El13Chile",
+          "epg": "mi.tv/cl/canal-13"
+        },
+        {
+          "name": "CHV Noticias",
+          "channel": "CHVNoticiasTV"
+        },
+        {
+          "name": "CHV",
+          "channel": "@Chilevision",
+          "epg": "mi.tv/cl/chilevision"
+        },
+        {
+          "name": "Mega",
+          "channel": "@Meganoticiasoficial"
+        },
+        {
+          "name": "24 Horas",
+          "channel": "@24Horas_TVNChile",
+          "epg": "mi.tv/cl/tvn-24-h"
+        },
+        {
+          "name": "TVN",
+          "channel": "@TVN_Chile",
+          "epg": "mi.tv/cl/tvn"
+        },
+        {
+          "name": "CIMA",
+          "url": "https://www.youtube.com/watch?v=2Xuay347_OM"
+        },
+        {
+          "name": "Subela",
+          "channel": "@SUBELARADIOCL"
+        },
+        {
+          "name": "Duna",
+          "channel": "@radioduna"
+        },
+        {
+          "name": "Biobio",
+          "channel": "@BioBioChile"
+        },
+        {
+          "name": "CNN Chile",
+          "channel": "cnnchile",
+          "epg": "mi.tv/cl/cnn-chile"
+        },
+        {
+          "name": "ADN",
+          "channel": "@adnradio"
+        },
+        {
+          "name": "Tele13 Radio",
+          "channel": "@Tele13Radio_Chile"
+        },
+        {
+          "name": "Cooperativa",
+          "channel": "@Cooperativafm"
+        },
+        {
+          "name": "KingKong",
+          "channel": "@KingKongMedia_Chile"
+        }
+      ]
+    },
+    {
+      "name": "Argentina",
+      "streams": [
+        {
+          "name": "La Nación",
+          "channel": "@lanacion",
+          "epg": "mi.tv/ar/la-nacion"
+        },
+        {
+          "name": "C5N",
+          "channel": "@c5n",
+          "epg": "mi.tv/ar/c5n"
+        },
+        {
+          "name": "elnueve",
+          "channel": "@elnueve",
+          "epg": "mi.tv/ar/canal-9"
+        },
+        {
+          "name": "Telefe",
+          "channel": "@Telefe",
+          "epg": "mi.tv/ar/telefe"
+        },
+        {
+          "name": "CronicaTV",
+          "channel": "@cronicatv",
+          "epg": "mi.tv/ar/cronica"
+        },
+        {
+          "name": "America",
+          "channel": "@americaenvivo",
+          "epg": "mi.tv/ar/america-2-capital"
+        },
+        {
+          "name": "Telefe Noticias",
+          "channel": "@Telefenoticias"
+        }
+      ]
+    },
+    {
+      "name": "Internacional",
+      "streams": [
+        {
+          "name": "RTVE Noticias",
+          "channel": "@rtvenoticias"
+        },
+        {
+          "name": "Reuters",
+          "channel": "@Reuters"
+        },
+        {
+          "name": "NewsMax",
+          "channel": "@NewsmaxTV"
+        },
+        {
+          "name": "El País",
+          "channel": "@elpais"
+        },
+        {
+          "name": "France24 Esp",
+          "channel": "@France24_es"
+        },
+        {
+          "name": "DW Esp",
+          "channel": "dwespanol"
+        },
+        {
+          "name": "CNN Esp",
+          "channel": "@cnnee"
+        },
+        {
+          "name": "ABC News",
+          "channel": "@ABCNews"
+        },
+        {
+          "name": "NBC News",
+          "channel": "@NBCNews"
+        },
+        {
+          "name": "Aljazeera Eng",
+          "channel": "@aljazeeraenglish"
+        },
+        {
+          "name": "CBS News",
+          "channel": "@CBSNews"
+        },
+        {
+          "name": "CNN",
+          "channel": "cnn"
+        },
+        {
+          "name": "DW News",
+          "channel": "@dwnews"
+        },
+        {
+          "name": "Bloomberg",
+          "channel": "@markets"
+        },
+        {
+          "name": "LiveNOW Fox",
+          "channel": "@livenowfox"
+        },
+        {
+          "name": "Sky News",
+          "channel": "@SkyNews"
+        },
+        {
+          "name": "CBC News",
+          "channel": "@CBCNews"
+        }
+      ]
+    },
+    {
+      "name": "Religiosos",
+      "streams": [
+        {
+          "name": "Nuevo Tiempo",
+          "channel": "@nuevotiempotv"
+        },
+        {
+          "name": "Novo Tempo",
+          "channel": "@novotempo"
+        },
+        {
+          "name": "Novo Tempo Port",
+          "channel": "@NovoTempoPortugal"
+        },
+        {
+          "name": "SUM",
+          "channel": "@SUMtvLatino"
+        },
+        {
+          "name": "3ABN",
+          "url": "https://3abn.bozztv.com/3abn2/3abn_live/smil:3abn_live.smil/playlist.m3u8",
+          "logo": "https://alpha.uscreencdn.com/images/programs/526675/horizontal/3ABN--1480x840.1659535621.jpg"
+        },
+        {
+          "name": "3ABN Proclaim!",
+          "url": "https://3abn.bozztv.com/3abn2/Pro_live/smil:Pro_live.smil/playlist.m3u8",
+          "logo": "https://alpha.uscreencdn.com/images/programs/527372/horizontal/Proclaim-1480x840.1659535750.jpg"
+        },
+        {
+          "name": "Dare to dream",
+          "url": "https://3abn.bozztv.com/3abn2/d2d_live/smil:d2d_live.smil/playlist.m3u8",
+          "logo": "https://alpha.uscreencdn.com/images/programs/530203/horizontal/D2D-1480x840.1659535818.jpg"
+        },
+        {
+          "name": "3ABN International",
+          "url": "https://3abn.bozztv.com/3abn2/Int_live/smil:Int_live.smil/playlist.m3u8",
+          "logo": "https://alpha.uscreencdn.com/images/programs/530218/horizontal/International1480x840.1659537368.jpg"
+        },
+        {
+          "name": "3ABN Canada",
+          "url": "https://3abn.bozztv.com/3abncanada/3ABN/master.m3u8",
+          "logo": "https://alpha.uscreencdn.com/images/programs/3084114/horizontal/1569f16b-e4a7-4797-b745-f9d50b5ffe13.jpg"
+        },
+        {
+          "name": "Praise Him",
+          "url": "https://3abn.bozztv.com/3abn1/PraiseHim/smil:PraiseHim.smil/playlist.m3u8",
+          "logo": "https://alpha.uscreencdn.com/images/programs/531102/horizontal/Praise-Him1480x840.1659537466.jpg"
+        },
+        {
+          "name": "3ABN Kids",
+          "url": "https://3abn.bozztv.com/3abn2/Kids_live/smil:Kids_live.smil/playlist.m3u8",
+          "logo": "https://alpha.uscreencdn.com/images/programs/532608/horizontal/Kids1480x840.1659537556.jpg"
+        },
+        {
+          "name": "3ABN Latino",
+          "url": "https://3abn.bozztv.com/3abn2/Lat_live/smil:Lat_live.smil/playlist.m3u8",
+          "logo": "https://alpha.uscreencdn.com/images/programs/534693/horizontal/Latino1480x840.1659537624.jpg"
+        },
+        {
+          "name": "Hope Channel",
+          "url": "https://jstre.am/live/jsl:0sUSK6VA7GT.m3u8"
+        },
+        {
+          "name": "Hope Channel Int",
+          "url": "https://jstre.am/live/jsl:cZXINbwrFj6.m3u8"
+        },
+        {
+          "name": "Amaing Facts",
+          "channel": "@AmazingFacts"
+        },
+        {
+          "name": "Hope Channel Canada",
+          "url": "https://jstre.am/live/jsl:CXcUJudUIEp.m3u8"
+        },
+        {
+          "name": "Hope Channel Interamerica",
+          "url": "https://jstre.am/live/jsl:EC0Mq0i6HJU.m3u8"
+        },
+        {
+          "name": "LLBN",
+          "url": "https://brightstar-hisword-pull-secure.akamaized.net/brightstarhisword/stream.m3u8"
+        },
+        {
+          "name": "SafeTV",
+          "url": "https://hls-live-stream-gc.cdn01.net/mpegts/232076_1259344/6EH_hwUlNRdmQb8IzWcVzg/1793073665/media_mpegts_0.m3u8"
+        },
+        {
+          "name": "Amazing Discoveries",
+          "url": "https://rpn3.bozztv.com/amazingd/amazingdtv-srt/index.m3u8"
+        },
+        {
+          "name": "It is written",
+          "url": "https://itiswrittentv.akamaized.net/xR8gyATuHMVx69u9G79DXnpNRL/playlist.m3u8"
+        },
+        {
+          "name": "LLBN Latino",
+          "url": "https://brightstar-latino-pull-secure.akamaized.net/brightstarlatino/stream.m3u8"
+        }
+      ]
+    },
+    {
+      "name": "Polymarket",
+      "streams": [
+        {
+          "name": "TX Senate Election",
+          "polymarket": "texas-senate-election-winner"
+        }
+      ]
+    }
+  ]
+}
