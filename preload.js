@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('livetv', {
   findSchedule: (epg) => ipcRenderer.invoke('find-schedule', epg),
   findLogo: (stream) => ipcRenderer.invoke('find-logo', stream),
   resolveMedia: (url) => ipcRenderer.invoke('resolve-media', url),
+  resolveRudo: (url) => ipcRenderer.invoke('resolve-rudo', url),
+  frameAudio: (name, audio) => ipcRenderer.send('frame-audio', { name, ...audio }),
   getSettings: () => ipcRenderer.invoke('get-settings'),
   setSettings: (changes) => ipcRenderer.invoke('set-settings', changes),
   toggleFullscreen: () => ipcRenderer.send('toggle-fullscreen'),

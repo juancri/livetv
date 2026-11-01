@@ -197,6 +197,18 @@ function isMediaUrl(url) {
   }
 }
 
+// Señal de rudo.video (rudo.video/live/<señal>, el reproductor de 13.cl y
+// otros canales chilenos): no es un stream sino una página; main.js saca de
+// ahí el .m3u8. Se mira antes que isMediaUrl, que también la aceptaría.
+function isRudo(url) {
+  try {
+    const u = new URL(url);
+    return /(^|\.)rudo\.video$/.test(u.hostname) && /^\/live\/[\w-]+\/?$/.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function isHls(url) {
   try {
     return new URL(url).pathname.toLowerCase().endsWith('.m3u8');
@@ -268,7 +280,7 @@ function parseStreamInput(text) {
   }
   if (/(^|\.)polymarket\.com$/.test(u.hostname) && u.pathname.startsWith('/event/')) return { polymarket: value };
   if (windyEmbedUrl(value)) return { windy: value };
-  if (isMediaUrl(value)) return { url: value };
+  if (isRudo(value) || isMediaUrl(value)) return { url: value };
   if (/(^|\.)(youtube\.com|youtu\.be)$/.test(u.hostname)) {
     if (parseVideoId(value)) return { url: value };
     if (/^\/(@[^/]+|channel\/UC[\w-]{22}|c\/[^/]+|user\/[^/]+)/.test(u.pathname)) return { channel: value };
@@ -402,8 +414,12 @@ function createPlayer(tile) {
     createWindy(tile);
     return;
   }
+  if (stream.url && isRudo(stream.url)) {
+    createRudo(tile);
+    return;
+  }
   if (stream.url && isMediaUrl(stream.url)) {
-    createVideo(tile);
+    createVideo(tile, stream.url);
     return;
   }
   if (!stream.url && !stream.channel) {
@@ -450,8 +466,9 @@ function createPlayer(tile) {
 }
 
 // Tile de un stream HLS: un <video> con hls.js. tile.player es un adaptador
-// con la misma interfaz que usan applyAudio y destroy() del YT.Player.
-function createVideo(tile) {
+// con la misma interfaz que usan applyAudio y destroy() del YT.Player. url es
+// la del stream o, para rudo.video, el .m3u8 que resolvió main.js.
+function createVideo(tile, url) {
   const video = document.createElement('video');
   video.className = 'player';
   video.autoplay = true;
@@ -501,7 +518,6 @@ function createVideo(tile) {
   video.addEventListener('ended', () => fail('Reintentando…'));
   video.addEventListener('error', () => fail(`Error ${video.error?.code ?? ''}`.trim()));
 
-  const url = tile.stream.url;
   if (!isHls(url)) {
     // Directo (Icecast, MP3…): con crossOrigin el audio puede pasar por Web
     // Audio (nivelador y barras); main.js agrega el CORS si el servidor no lo
@@ -537,6 +553,71 @@ function createVideo(tile) {
     return;
   }
   video.play().catch(() => {});
+  applyAudio();
+}
+
+// Señal de rudo.video: main.js mira la página del reproductor. Si trae el
+// .m3u8, va a createVideo; si no (Canal 13, por Google DAI con token), se
+// embebe el reproductor oficial. Mientras se resuelve, tile.player es un
+// marcador sin audio: destruirlo (recarga, Shift+H, cambio de categoría)
+// descarta el resultado.
+function createRudo(tile) {
+  let cancelled = false;
+  const pending = { mute() {}, unMute() {}, setVolume() {}, destroy: () => { cancelled = true; } };
+  tile.player = pending;
+  setStatus(tile, 'Cargando…');
+  const retry = (text) => {
+    setNoSignal(tile, 'Sin señal');
+    setStatus(tile, text);
+    tile.retryTimer = setTimeout(() => createPlayer(tile), ENDED_RETRY_MS);
+  };
+  window.livetv.resolveRudo(tile.stream.url).then(
+    (res) => {
+      if (cancelled || tile.player !== pending) return;
+      if (res?.hls) createVideo(tile, res.hls);
+      else if (res?.embed) createRudoEmbed(tile);
+      else retry('Sin señal, reintentando…');
+    },
+    () => {
+      if (!cancelled && tile.player === pending) retry('Error de rudo.video');
+    },
+  );
+}
+
+// Reproductor oficial de rudo.video en un iframe. Es de otro origen y no tiene
+// API de audio: el adaptador le pide a main.js que fije muted/volume en sus
+// <video> (IPC frame-audio, el frame se busca por su atributo name).
+let embedSeq = 0;
+function createRudoEmbed(tile) {
+  const name = `livetv-embed-${++embedSeq}`;
+  const src = new URL(tile.stream.url);
+  src.searchParams.set('autostart', '1');
+  src.searchParams.set('volume', '0');
+  const frame = document.createElement('iframe');
+  frame.name = name;
+  frame.allow = 'autoplay; fullscreen; encrypted-media';
+  frame.src = src.href;
+  frame.addEventListener('load', () => {
+    if (tile.player !== player) return;
+    setStatus(tile, '');
+    setNoSignal(tile, null);
+    setOffline(tile, false);
+  });
+  const audio = { muted: true, volume };
+  const send = () => window.livetv.frameAudio(name, audio);
+  const player = {
+    mute: () => { audio.muted = true; send(); },
+    unMute: () => { audio.muted = false; send(); },
+    setVolume: (v) => { audio.volume = v; send(); },
+    destroy: () => {
+      window.livetv.frameAudio(name, { muted: null });
+      frame.remove();
+    },
+  };
+  tile.player = player;
+  tile.ready = true;
+  send();
+  tile.playerHost.append(frame);
   applyAudio();
 }
 

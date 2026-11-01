@@ -285,6 +285,20 @@ async function fetchLogo(stream) {
   return null;
 }
 
+// rudo.video (el reproductor de 13.cl, T13 y otros canales chilenos) no expone
+// el .m3u8 en la URL: la página rudo.video/live/<señal> lo arma en el script
+// del reproductor. Se saca de ahí cada vez, por si cambia: { hls }. Algunas
+// señales (Canal 13) van por Google DAI con un token que arma el reproductor;
+// esas se muestran con el reproductor oficial en un iframe: { embed: true }.
+// null si la señal no existe.
+async function resolveRudo(url) {
+  const page = await fetchPage(url);
+  const m = /https:\/\/redirector\.rudo\.video\/[^"'\s]+?\.m3u8/.exec(page);
+  if (m) return { hls: m[0] };
+  if (/var streamURL = '[^']+'/.test(page)) return { embed: true };
+  return null;
+}
+
 // Nombre para un stream agregado sin nombre: el título del canal, del video o
 // del evento de Polymarket, o "Windy". Si no se puede averiguar queda sin nombre.
 async function guessName(stream) {
@@ -350,22 +364,49 @@ function saveSettings(win, changes) {
   const tmp = `${SETTINGS_FILE}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(settings, null, 2)}\n`);
   fs.renameSync(tmp, SETTINGS_FILE);
-  for (const frame of youtubeFrames(win)) {
+  for (const frame of mediaFrames(win)) {
     frame.executeJavaScript(`window.livetvLeveler?.(${settings.leveler})`).catch(() => {});
   }
   return settings;
 }
 
 // El nivelador de volumen (renderer/leveler.js) se inyecta en cada iframe de
-// YouTube: es de otro origen y el renderer no puede tocar su audio.
+// YouTube o rudo.video: son de otro origen y el renderer no puede tocar su audio.
 const LEVELER_JS = fs.readFileSync(path.join(RENDERER_DIR, 'leveler.js'), 'utf8');
 
-function isYoutubeFrame(frame) {
-  return frame.url.startsWith('https://www.youtube.com/');
+// También en los iframes del reproductor de rudo.video (señales embebidas).
+function isMediaFrame(frame) {
+  return frame.url.startsWith('https://www.youtube.com/') || frame.url.startsWith('https://rudo.video/');
 }
 
-function youtubeFrames(win) {
-  return win.webContents.mainFrame.framesInSubtree.filter(isYoutubeFrame);
+function mediaFrames(win) {
+  return win.webContents.mainFrame.framesInSubtree.filter(isMediaFrame);
+}
+
+// Audio de un iframe embebido que no es de YouTube (sin API para silenciarlo):
+// el renderer lo identifica por su atributo name y main.js fija muted/volume en
+// sus <video>. Se reaplica cada 500 ms porque el reproductor (avisos, cambio de
+// calidad) los vuelve a tocar, y al recargar el frame (frameAudio por nombre).
+const frameAudio = new Map();
+const FRAME_AUDIO_JS = `(() => {
+  const apply = () => {
+    const a = window.livetvAudio;
+    document.querySelectorAll('video').forEach((v) => {
+      if (v.muted !== a.muted) v.muted = a.muted;
+      if (!a.muted && Math.abs(v.volume - a.volume) > 0.001) v.volume = a.volume;
+    });
+  };
+  window.livetvAudioTimer ||= setInterval(apply, 500);
+  apply();
+})();`;
+
+function setFrameAudio(frame, { muted, volume }) {
+  const state = JSON.stringify({ muted, volume: Math.max(0, Math.min(1, volume / 100)) });
+  frame.executeJavaScript(`window.livetvAudio = ${state};\n${FRAME_AUDIO_JS}`, true).catch(() => {});
+}
+
+function frameByName(win, name) {
+  return win.webContents.mainFrame.framesInSubtree.find((f) => f.name === name);
 }
 
 // Los embeds de YouTube fallan desde file:// (sin Referer/origin válido),
@@ -435,9 +476,10 @@ async function createWindow() {
   win.webContents.on('did-frame-finish-load', (_e, isMainFrame, processId, routingId) => {
     if (isMainFrame) return;
     const frame = webFrameMain.fromId(processId, routingId);
-    if (frame && isYoutubeFrame(frame)) {
+    if (frame && isMediaFrame(frame)) {
       frame.executeJavaScript(`${LEVELER_JS}\nwindow.livetvLeveler(${settings.leveler});`, true).catch(() => {});
     }
+    if (frame && frameAudio.has(frame.name)) setFrameAudio(frame, frameAudio.get(frame.name));
   });
   win.loadURL(`http://127.0.0.1:${port}/`);
 }
@@ -450,6 +492,7 @@ ipcMain.handle('add-stream', (_e, args) => addStream(args));
 ipcMain.handle('find-schedule', (_e, epg) => findSchedule(epg));
 ipcMain.handle('find-logo', (_e, stream) => findLogo(stream));
 ipcMain.handle('resolve-media', (_e, url) => resolveMedia(url));
+ipcMain.handle('resolve-rudo', (_e, url) => resolveRudo(url));
 ipcMain.handle('get-settings', () => settings);
 ipcMain.handle('set-settings', (e, changes) => saveSettings(BrowserWindow.fromWebContents(e.sender), changes));
 ipcMain.on('toggle-fullscreen', (e) => {
@@ -457,6 +500,15 @@ ipcMain.on('toggle-fullscreen', (e) => {
   win.setFullScreen(!win.isFullScreen());
 });
 ipcMain.on('quit', () => app.quit());
+ipcMain.on('frame-audio', (e, { name, muted, volume }) => {
+  if (muted == null) {
+    frameAudio.delete(name);
+    return;
+  }
+  frameAudio.set(name, { muted, volume });
+  const frame = frameByName(BrowserWindow.fromWebContents(e.sender), name);
+  if (frame) setFrameAudio(frame, { muted, volume });
+});
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
